@@ -123,8 +123,6 @@ export class MisisleDB extends Dexie {
   }
 }
 
-export const db = new MisisleDB()
-
 export function createDefaultSettings(): GlobalSettings {
   return {
     theme: {
@@ -191,19 +189,105 @@ export function createDefaultSettings(): GlobalSettings {
       enableDailyRitual: true,
       ritualDurationSeconds: 5,
     },
+    home: {
+      profile: {
+        displayName: '我的主页',
+        signature: '今天也在雾里慢慢生活。',
+        avatarUrl: '',
+        backgroundUrl: '',
+      },
+      together: {
+        title: '在一起的第',
+        startDate: '2024-01-01',
+        leftAvatarUrl: '',
+        rightAvatarUrl: '',
+        note: '仅作为首页美化组件，不绑定真实关系。',
+      },
+      images: {
+        largeImageUrl: '',
+        smallImageUrl: '',
+        largeTitle: '大图组件',
+        smallTitle: '小图组件',
+      },
+      messageBoard: {
+        mode: 'ai',
+        selectedCharacterIds: [],
+        lastSeenAt: Date.now(),
+      },
+    },
   }
 }
+
 
 // 初始化默认设置
 export async function initDefaultSettings(): Promise<void> {
   const existing = await db.settings.get('global')
 
   if (!existing) {
-    await db.settings.put({
-      id: 'global',
-      ...createDefaultSettings(),
-    })
-    return
+     await db.settings.put({
+    ...existing,
+    theme: {
+      ...defaults.theme,
+      ...existing.theme,
+      cssVariables: {
+        ...defaults.theme.cssVariables,
+        ...(existing.theme?.cssVariables ?? {}),
+      },
+    },
+    bubble: {
+      ...defaults.bubble,
+      ...existing.bubble,
+    },
+    ai: {
+      ...defaults.ai,
+      ...(existing.ai ?? {}),
+    },
+    backgroundTriggers: {
+      ...defaults.backgroundTriggers,
+      ...(existing.backgroundTriggers ?? {}),
+    },
+    notifications: {
+      ...defaults.notifications,
+      ...existing.notifications,
+      modules: {
+        ...defaults.notifications.modules,
+        ...(existing.notifications?.modules ?? {}),
+      },
+    },
+    memory: {
+      ...defaults.memory,
+      ...existing.memory,
+    },
+    sync: {
+      ...defaults.sync,
+      ...existing.sync,
+    },
+    zicard: {
+      ...defaults.zicard,
+      ...existing.zicard,
+    },
+    home: {
+      ...defaults.home,
+      ...(existing.home ?? {}),
+      profile: {
+        ...defaults.home.profile,
+        ...(existing.home?.profile ?? {}),
+      },
+      together: {
+        ...defaults.home.together,
+        ...(existing.home?.together ?? {}),
+      },
+      images: {
+        ...defaults.home.images,
+        ...(existing.home?.images ?? {}),
+      },
+      messageBoard: {
+        ...defaults.home.messageBoard,
+        ...(existing.home?.messageBoard ?? {}),
+      },
+    },
+  })
+
   }
 
   // 兼容旧数据：已有 settings 时补齐新增字段，避免 settings.ai 未定义报错

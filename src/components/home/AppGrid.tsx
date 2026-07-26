@@ -18,37 +18,83 @@ interface AppItem {
   description: string
 }
 
-function EmojiIcon({
-  emoji,
-  className,
-}: {
-  emoji: string
-  className?: string
-}) {
-  return (
-    <span
-      className={className}
-      aria-hidden="true"
-    >
-      {emoji}
-    </span>
-  )
-}
-
 const IconTarot = ({ className }: { className?: string }) => (
-  <EmojiIcon emoji="🔮" className={className} />
+  <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+    <path
+      d="M8.2 4.8h7.6c.9 0 1.6.7 1.6 1.6v11.2c0 .9-.7 1.6-1.6 1.6H8.2c-.9 0-1.6-.7-1.6-1.6V6.4c0-.9.7-1.6 1.6-1.6Z"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    />
+    <path
+      d="M12 8.1v7.8M9.7 10.1h4.6M9.7 13.9h4.6"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+  </svg>
 )
 
 const IconNovelRP = ({ className }: { className?: string }) => (
-  <EmojiIcon emoji="📖" className={className} />
+  <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+    <path
+      d="M5.4 5.4h8.4c1.2 0 2.2 1 2.2 2.2v11H7.6c-1.2 0-2.2-1-2.2-2.2v-11Z"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M16 7.5h1.4c1.2 0 2.2 1 2.2 2.2v8.9"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+    <path
+      d="M8.1 8.7h5.1M8.1 11.7h5.8M8.1 14.7h3.7"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+  </svg>
 )
 
 const IconTodo = ({ className }: { className?: string }) => (
-  <EmojiIcon emoji="✅" className={className} />
+  <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+    <path
+      d="M7.2 5.2h9.6c1.1 0 2 .9 2 2v9.6c0 1.1-.9 2-2 2H7.2c-1.1 0-2-.9-2-2V7.2c0-1.1.9-2 2-2Z"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    />
+    <path
+      d="m8.4 12.2 2.2 2.2 5-5.1"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
 )
 
 const IconVocab = ({ className }: { className?: string }) => (
-  <EmojiIcon emoji="📝" className={className} />
+  <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+    <path
+      d="M6.2 5.3h8.2c1.1 0 2 .9 2 2v11.4H8.2c-1.1 0-2-.9-2-2V5.3Z"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M16.4 7.5h1.4c1.1 0 2 .9 2 2v9.2"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+    <path
+      d="M8.8 9h4.4M8.8 12h3.2"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+  </svg>
 )
 
 const apps: AppItem[] = [
@@ -131,10 +177,10 @@ export function AppGrid() {
         <Link
           key={app.id}
           href={app.href}
-          className="glass rounded-2xl p-4 flex flex-col gap-3 hover:bg-white/5 transition-colors min-h-[128px]"
+          className="glass rounded-2xl p-4 flex flex-col gap-3 hover:bg-white/[0.06] transition-colors min-h-[132px] border border-white/10"
         >
-          <div className="w-11 h-11 rounded-2xl bg-white/5 flex items-center justify-center">
-            <app.icon className="w-7 h-7 text-mist-text text-2xl flex items-center justify-center" />
+          <div className="w-11 h-11 rounded-2xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-mist-text">
+            <app.icon className="w-6 h-6" />
           </div>
 
           <div>
@@ -148,3 +194,4 @@ export function AppGrid() {
     </div>
   )
 }
+

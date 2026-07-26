@@ -204,6 +204,7 @@ export interface KnowledgeEntry {
 // ============================================
 // 全局设置
 // ============================================
+
 export interface GlobalSettings {
   theme: {
     colorScheme: 'dark' | 'light' | 'custom'
@@ -258,7 +259,10 @@ export interface GlobalSettings {
     enableDailyRitual: boolean
     ritualDurationSeconds: number
   }
+
+  home: HomeSettings
 }
+
 
 // ============================================
 // Widget 配置（主页）
@@ -445,4 +449,41 @@ export interface HomeMessageBoardItem {
   source: 'ai' | 'zicard'
   content: string
   createdAt: number
+}
+// ============================================
+// 首页个性化设置
+// ============================================
+export interface HomeSettings {
+  profile: HomeProfileSettings
+  together: HomeTogetherSettings
+  images: HomeImageSettings
+  messageBoard: HomeMessageBoardSettings
+}
+
+export interface HomeProfileSettings {
+  displayName: string
+  signature: string
+  avatarUrl: string
+  backgroundUrl: string
+}
+
+export interface HomeTogetherSettings {
+  title: string
+  startDate: string
+  leftAvatarUrl: string
+  rightAvatarUrl: string
+  note: string
+}
+
+export interface HomeImageSettings {
+  largeImageUrl: string
+  smallImageUrl: string
+  largeTitle: string
+  smallTitle: string
+}
+
+export interface HomeMessageBoardSettings {
+  mode: 'ai' | 'zicard'
+  selectedCharacterIds: string[]
+  lastSeenAt: number
 }

@@ -1,12 +1,21 @@
 'use client'
 
+import { useEffect } from 'react'
 import { AppGrid } from './AppGrid'
 import { HomeWidgets } from './HomeWidgets'
+import { useSettingsStore } from '@/lib/stores/settings'
 
 export function HomeScreen() {
+  const { isLoaded, loadSettings } = useSettingsStore()
+
+  useEffect(() => {
+    if (!isLoaded) {
+      void loadSettings()
+    }
+  }, [isLoaded, loadSettings])
+
   return (
     <main className="min-h-screen p-6 pb-12">
-      {/* 顶部标题区 */}
       <header className="mb-6">
         <p className="text-xs tracking-[0.35em] text-mist-text-secondary uppercase">
           Misisle
@@ -17,12 +26,10 @@ export function HomeScreen() {
         </p>
       </header>
 
-      {/* 首页小组件 */}
       <section className="mb-8">
         <HomeWidgets />
       </section>
 
-      {/* App 入口网格 */}
       <section>
         <div className="flex items-end justify-between mb-4">
           <div>
