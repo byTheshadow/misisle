@@ -147,12 +147,14 @@ export const useZicardStore = create<ZicardState>((set, get) => ({
     await get().loadSession(sessionId)
   },
 
-  acceptSaveRequest: async (messageId) => {
+    acceptSaveRequest: async (messageId) => {
     const message = get().messages.find((item) => item.id === messageId)
     if (!message || !message.requestAction) return
 
+    const sourceMessageId = message.requestAction.sourceMessageId
+
     const sourceMessage = get().messages.find(
-      (item) => item.id === message.requestAction?.sourceMessageId
+      (item) => item.id === sourceMessageId
     )
     if (!sourceMessage) return
 
@@ -191,7 +193,7 @@ export const useZicardStore = create<ZicardState>((set, get) => ({
       await db.zicardMessages.update(messageId, {
         requestAction: {
           kind: 'save_user_message_as_zicard',
-          sourceMessageId: message.requestAction.sourceMessageId,
+          sourceMessageId,
           status: 'accepted',
         },
         updatedAt: now,
@@ -207,7 +209,7 @@ export const useZicardStore = create<ZicardState>((set, get) => ({
               ...item,
               requestAction: {
                 kind: 'save_user_message_as_zicard',
-                sourceMessageId: message.requestAction!.sourceMessageId,
+                sourceMessageId,
                 status: 'accepted',
               },
               updatedAt: now,
@@ -221,12 +223,13 @@ export const useZicardStore = create<ZicardState>((set, get) => ({
     const message = get().messages.find((item) => item.id === messageId)
     if (!message || !message.requestAction) return
 
+    const sourceMessageId = message.requestAction.sourceMessageId
     const now = Date.now()
 
     await db.zicardMessages.update(messageId, {
       requestAction: {
         kind: 'save_user_message_as_zicard',
-        sourceMessageId: message.requestAction.sourceMessageId,
+        sourceMessageId,
         status: 'rejected',
       },
       updatedAt: now,
@@ -239,7 +242,7 @@ export const useZicardStore = create<ZicardState>((set, get) => ({
               ...item,
               requestAction: {
                 kind: 'save_user_message_as_zicard',
-                sourceMessageId: message.requestAction!.sourceMessageId,
+                sourceMessageId,
                 status: 'rejected',
               },
               updatedAt: now,
@@ -248,6 +251,7 @@ export const useZicardStore = create<ZicardState>((set, get) => ({
       ),
     }))
   },
+
 
   createSessionFromCharacter: async (character) => {
     const now = Date.now()
