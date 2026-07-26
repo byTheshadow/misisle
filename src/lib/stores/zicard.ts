@@ -109,49 +109,37 @@ export const useZicardStore = create<ZicardState>((set, get) => ({
   lastAskToSaveAt: null,
 
   loadAll: async () => {
-    const [sessions, messages, libraries, fragments, traces, diaries] = await Promise.all([
-      db.zicardSessions.toArray(),
-      db.zicardMessages.toArray(),
-      db.zicardLibraries.toArray(),
-      db.zicardFragments.toArray(),
-      db.zicardTraces.toArray(),
-      db.zicardDiaries.toArray(),
+    const [sessions, libraries, fragments] = await Promise.all([
+      db.zicardSessions.orderBy('lastMessageAt').reverse().toArray(),
+      db.zicardLibraries.orderBy('createdAt').reverse().toArray(),
+      db.zicardFragments.orderBy('createdAt').reverse().toArray(),
     ])
 
     set({
       sessions,
-      messages,
       libraries,
       fragments,
-      traces,
-      diaries,
       isLoaded: true,
     })
   },
 
   loadSession: async (sessionId) => {
-    const [session, messages] = await Promise.all([
+    const [session, messages, libraries, fragments, traces, diaries] = await Promise.all([
       db.zicardSessions.get(sessionId),
       db.zicardMessages.where('sessionId').equals(sessionId).sortBy('createdAt'),
-    ])
-
-    if (!session) return
-
-    const [libraries, fragments, traces, diaries] = await Promise.all([
-      db.zicardLibraries.toArray(),
-      db.zicardFragments.toArray(),
-      db.zicardTraces.toArray(),
-      db.zicardDiaries.toArray(),
+      db.zicardLibraries.orderBy('createdAt').reverse().toArray(),
+      db.zicardFragments.orderBy('createdAt').reverse().toArray(),
+      db.zicardTraces.where('sessionId').equals(sessionId).sortBy('createdAt'),
+      db.zicardDiaries.where('sessionId').equals(sessionId).sortBy('createdAt'),
     ])
 
     set({
-      currentSession: session,
+      currentSession: session ?? null,
       messages,
       libraries,
       fragments,
       traces,
       diaries,
-      isLoaded: true,
     })
   },
 
@@ -274,22 +262,41 @@ export const useZicardStore = create<ZicardState>((set, get) => ({
         id: generateId(),
         characterId: null,
         name: '通用字卡库',
-        description: '全局可用的字卡资料库',
+        description: '所有角色都可以使用的通用字卡。',
+        scope: 'global',
         createdAt: now,
         updatedAt: now,
+        settings: {
+          enableKeywordTrigger: false,
+          autoWeather: false,
+          manualWeather: '',
+          replyDelayMin: 0,
+          replyDelayMax: 1,
+          allowMultiBubble: true,
+          allowCombinedBubble: true,
+        },
       }
+
       await db.zicardLibraries.add(globalLibrary)
     }
 
     const session: ZicardSession = {
       id: generateId(),
+      characterSource: 'global_character',
       characterId: character.id,
-      name: character.name,
+      localCharacter: null,
+      userIdentityId: null,
+      title: character.name,
       avatar: character.avatar,
-      personality: character.personality,
-      description: character.description,
+      libraryIds: [globalLibrary.id],
+      mode: 'deep_random',
+      typingIndicatorText: '正在输入…',
       replyDelay: getDefaultReplyDelay(),
       theme: getDefaultTheme(),
+      todayStatus: null,
+      lastMessage: '',
+      lastMessageAt: now,
+      unreadCount: 0,
       createdAt: now,
       updatedAt: now,
     }
@@ -297,7 +304,7 @@ export const useZicardStore = create<ZicardState>((set, get) => ({
     await db.zicardSessions.add(session)
 
     set((state) => ({
-      sessions: [...state.sessions, session],
+      sessions: [session, ...state.sessions],
       currentSession: session,
     }))
 
@@ -307,15 +314,56 @@ export const useZicardStore = create<ZicardState>((set, get) => ({
   createLocalSession: async (data) => {
     const now = Date.now()
 
+    let globalLibrary = await db.zicardLibraries
+      .where('characterId')
+      .equals(null as any)
+      .first()
+
+    if (!globalLibrary) {
+      globalLibrary = {
+        id: generateId(),
+        characterId: null,
+        name: '通用字卡库',
+        description: '所有角色都可以使用的通用字卡。',
+        scope: 'global',
+        createdAt: now,
+        updatedAt: now,
+        settings: {
+          enableKeywordTrigger: false,
+          autoWeather: false,
+          manualWeather: '',
+          replyDelayMin: 0,
+          replyDelayMax: 1,
+          allowMultiBubble: true,
+          allowCombinedBubble: true,
+        },
+      }
+
+      await db.zicardLibraries.add(globalLibrary)
+    }
+
     const session: ZicardSession = {
       id: generateId(),
+      characterSource: 'zicard_local',
       characterId: null,
-      name: data.name,
-      avatar: data.avatar,
-      personality: data.personality,
-      description: data.description,
+      localCharacter: {
+        name: data.name,
+        avatar: data.avatar ?? '',
+        personality: data.personality ?? '',
+        description: data.description ?? '',
+      },
+      userIdentityId: null,
+      title: data.name,
+      avatar: data.avatar ?? '',
+      libraryIds: [globalLibrary.id],
+      mode: 'deep_random',
+      typingIndicatorText: '正在输入…',
       replyDelay: getDefaultReplyDelay(),
       theme: getDefaultTheme(),
+      todayStatus: null,
+      lastMessage: '',
+      lastMessageAt: now,
+      unreadCount: 0,
       createdAt: now,
       updatedAt: now,
     }
@@ -323,7 +371,7 @@ export const useZicardStore = create<ZicardState>((set, get) => ({
     await db.zicardSessions.add(session)
 
     set((state) => ({
-      sessions: [...state.sessions, session],
+      sessions: [session, ...state.sessions],
       currentSession: session,
     }))
 
@@ -332,20 +380,31 @@ export const useZicardStore = create<ZicardState>((set, get) => ({
 
   createLibrary: async (data) => {
     const now = Date.now()
+    const characterId = data.characterId ?? null
 
     const library: ZicardLibrary = {
       id: generateId(),
-      characterId: data.characterId ?? null,
+      characterId,
       name: data.name,
-      description: data.description,
+      description: data.description ?? '',
+      scope: characterId ? 'character_bound' : 'global',
       createdAt: now,
       updatedAt: now,
+      settings: {
+        enableKeywordTrigger: false,
+        autoWeather: false,
+        manualWeather: '',
+        replyDelayMin: 0,
+        replyDelayMax: 1,
+        allowMultiBubble: true,
+        allowCombinedBubble: true,
+      },
     }
 
     await db.zicardLibraries.add(library)
 
     set((state) => ({
-      libraries: [...state.libraries, library],
+      libraries: [library, ...state.libraries],
     }))
 
     return library
@@ -357,10 +416,19 @@ export const useZicardStore = create<ZicardState>((set, get) => ({
     const fragment: ZicardFragment = {
       id: generateId(),
       libraryId: data.libraryId,
-      text: data.text,
-      category: data.category ?? '',
-      tags: normalizeTags(data.tags),
       kind: data.kind ?? 'text',
+      position: 'single',
+      text: data.text,
+      category: data.category ?? '普通',
+      tags: normalizeTags(data.tags),
+      weight: 1,
+      enabled: true,
+      conditions: {
+        timeSlots: [],
+        weather: [],
+        dates: [],
+        keywords: [],
+      },
       createdAt: now,
       updatedAt: now,
     }
@@ -368,68 +436,356 @@ export const useZicardStore = create<ZicardState>((set, get) => ({
     await db.zicardFragments.add(fragment)
 
     set((state) => ({
-      fragments: [...state.fragments, fragment],
+      fragments: [fragment, ...state.fragments],
     }))
 
     return fragment
   },
 
-  sendUserMessage: async (sessionId, content, quoteMessageId) => {
+  sendUserMessage: async (sessionId, content, quoteMessageId = null) => {
     const now = Date.now()
+    const state = get()
 
-    const message: ZicardMessage = {
+    const quoteSource = quoteMessageId
+      ? state.messages.find((message) => message.id === quoteMessageId)
+      : null
+
+    const userMessage: ZicardMessage = {
       id: generateId(),
       sessionId,
-      role: 'user',
+      sender: 'user',
+      type: 'text',
       content,
-      quoteMessageId: quoteMessageId ?? null,
+      zicardIds: [],
+      responseGroupId: null,
+      quote: quoteSource
+        ? {
+            messageId: quoteSource.id,
+            sender: quoteSource.sender,
+            content: quoteSource.content,
+          }
+        : null,
+      isRead: true,
+      deletedAt: null,
       createdAt: now,
       updatedAt: now,
     }
 
-    await db.zicardMessages.add(message)
+    await db.zicardMessages.add(userMessage)
 
-    set((state) => ({
-      messages: [...state.messages, message],
+    await db.zicardSessions.update(sessionId, {
+      lastMessage: content,
+      lastMessageAt: now,
+      updatedAt: now,
+    })
+
+    set((current) => ({
+      messages: [...current.messages, userMessage],
+      sessions: current.sessions.map((session) =>
+        session.id === sessionId
+          ? {
+              ...session,
+              lastMessage: content,
+              lastMessageAt: now,
+              updatedAt: now,
+            }
+          : session
+      ),
+      currentSession:
+        current.currentSession?.id === sessionId
+          ? {
+              ...current.currentSession,
+              lastMessage: content,
+              lastMessageAt: now,
+              updatedAt: now,
+            }
+          : current.currentSession,
     }))
+
+    const shouldAsk = shouldRandomlyAskToSaveMessage({
+      userContent: content,
+      lastAskedAt: get().lastAskToSaveAt,
+      now,
+    })
+
+    if (shouldAsk) {
+      const requestMessage: ZicardMessage = {
+        id: generateId(),
+        sessionId,
+        sender: 'character',
+        type: 'zicard-request',
+        content: '这句话……我可以留下来吗？',
+        zicardIds: [],
+        responseGroupId: null,
+        quote: null,
+        requestAction: {
+          kind: 'save_user_message_as_zicard',
+          sourceMessageId: userMessage.id,
+          status: 'pending',
+        },
+        isRead: true,
+        deletedAt: null,
+        createdAt: now + 1,
+        updatedAt: now + 1,
+      }
+
+      await db.zicardMessages.add(requestMessage)
+
+      set((current) => ({
+        messages: [...current.messages, requestMessage],
+        lastAskToSaveAt: now,
+      }))
+
+      return
+    }
+
+    await get().generateCharacterReply(sessionId)
   },
 
   generateCharacterReply: async (sessionId) => {
-    // 省略其余原有实现
+    const session = await db.zicardSessions.get(sessionId)
+    if (!session) return
+
+    set({
+      isTyping: true,
+      replyingSessionId: sessionId,
+    })
+
+    const delayMs =
+      session.replyDelay.type === 'instant'
+        ? 500
+        : session.replyDelay.type === 'fixed'
+          ? Math.max(0, session.replyDelay.fixedMinutes) * 60 * 1000
+          : Math.max(
+              0,
+              Math.floor(
+                (session.replyDelay.minMinutes +
+                  Math.random() *
+                    Math.max(0, session.replyDelay.maxMinutes - session.replyDelay.minMinutes)) *
+                  60 *
+                  1000
+              )
+            )
+
+    await new Promise((resolve) => window.setTimeout(resolve, delayMs))
+
+    const allFragments = await db.zicardFragments.toArray()
+
+    const availableFragments = allFragments.filter((fragment) =>
+      session.libraryIds.includes(fragment.libraryId)
+    )
+
+    const result = generateDeepRandomZicardMessages({
+      sessionId,
+      fragments: availableFragments,
+    })
+
+    const now = Date.now()
+
+    const messages: ZicardMessage[] = result.messages.map((message, index) => ({
+      id: generateId(),
+      ...message,
+      createdAt: now + index,
+      updatedAt: now + index,
+    }))
+
+    await db.zicardMessages.bulkAdd(messages)
+
+    const lastMessage = messages[messages.length - 1]?.content ?? ''
+
+    await db.zicardSessions.update(sessionId, {
+      lastMessage,
+      lastMessageAt: now,
+      updatedAt: now,
+    })
+
+    set((state) => ({
+      messages: [...state.messages, ...messages],
+      sessions: state.sessions.map((item) =>
+        item.id === sessionId
+          ? {
+              ...item,
+              lastMessage,
+              lastMessageAt: now,
+              updatedAt: now,
+            }
+          : item
+      ),
+      currentSession:
+        state.currentSession?.id === sessionId
+          ? {
+              ...state.currentSession,
+              lastMessage,
+              lastMessageAt: now,
+              updatedAt: now,
+            }
+          : state.currentSession,
+      isTyping: false,
+      replyingSessionId: null,
+    }))
   },
 
   deleteMessage: async (messageId) => {
-    // 省略其余原有实现
+    const now = Date.now()
+
+    await db.zicardMessages.update(messageId, {
+      deletedAt: now,
+      updatedAt: now,
+    })
+
+    set((state) => ({
+      messages: state.messages.map((message) =>
+        message.id === messageId
+          ? {
+              ...message,
+              deletedAt: now,
+              updatedAt: now,
+            }
+          : message
+      ),
+    }))
   },
 
   setQuoteTarget: (messageId) => {
-    // 省略其余原有实现
-    return null
+    if (!messageId) return null
+    return get().messages.find((message) => message.id === messageId) ?? null
   },
 
   addTraceFromMessage: async (messageId) => {
-    // 省略其余原有实现
+    const message = get().messages.find((item) => item.id === messageId)
+    if (!message) return
+
+    const now = Date.now()
+
+    const trace: ZicardTrace = {
+      id: generateId(),
+      sessionId: message.sessionId,
+      source: message.sender === 'user' ? 'user_message' : 'past_event',
+      sourceMessageId: message.id,
+      content: message.content,
+      excerpt: message.content.slice(0, 30),
+      tags: [],
+      pinned: false,
+      canEcho: true,
+      createdAt: now,
+      updatedAt: now,
+    }
+
+    await db.zicardTraces.add(trace)
+
+    set((state) => ({
+      traces: [...state.traces, trace],
+    }))
   },
 
   addDiaryFromMessage: async (messageId) => {
-    // 省略其余原有实现
+    const message = get().messages.find((item) => item.id === messageId)
+    if (!message) return
+
+    const now = Date.now()
+
+    const diary: ZicardDiaryEntry = {
+      id: generateId(),
+      sessionId: message.sessionId,
+      title: '从消息生成的日记',
+      content: message.content,
+      source: 'message',
+      sourceId: message.id,
+      mood: '',
+      tags: [],
+      createdAt: now,
+      updatedAt: now,
+    }
+
+    await db.zicardDiaries.add(diary)
+
+    set((state) => ({
+      diaries: [...state.diaries, diary],
+    }))
   },
 
   drawTodayStatus: async (sessionId) => {
-    // 省略其余原有实现
+    const session = await db.zicardSessions.get(sessionId)
+    if (!session) return
+
+    const fragments = await db.zicardFragments.toArray()
+    const statusFragments = fragments.filter(
+      (fragment) =>
+        session.libraryIds.includes(fragment.libraryId) &&
+        fragment.enabled &&
+        fragment.kind === 'status'
+    )
+
+    const picked = statusFragments[Math.floor(Math.random() * statusFragments.length)]
+
+    if (!picked) return
+
+    const now = Date.now()
+
+    const todayStatus = {
+      content: picked.text,
+      zicardId: picked.id,
+      drawnAt: now,
+    }
+
+    await db.zicardSessions.update(sessionId, {
+      todayStatus,
+      updatedAt: now,
+    })
+
+    set((state) => ({
+      currentSession:
+        state.currentSession?.id === sessionId
+          ? {
+              ...state.currentSession,
+              todayStatus,
+              updatedAt: now,
+            }
+          : state.currentSession,
+      sessions: state.sessions.map((item) =>
+        item.id === sessionId
+          ? {
+              ...item,
+              todayStatus,
+              updatedAt: now,
+            }
+          : item
+      ),
+    }))
   },
 
   exportSession: async (sessionId) => {
-    // 省略其余原有实现
+    const session = await db.zicardSessions.get(sessionId)
+
+    if (!session) {
+      throw new Error('会话不存在')
+    }
+
+    const [messages, libraries, fragments, diaries, traces, userNotes] =
+      await Promise.all([
+        db.zicardMessages.where('sessionId').equals(sessionId).toArray(),
+        db.zicardLibraries.where('id').anyOf(session.libraryIds).toArray(),
+        db.zicardFragments.where('libraryId').anyOf(session.libraryIds).toArray(),
+        db.zicardDiaries.where('sessionId').equals(sessionId).toArray(),
+        db.zicardTraces.where('sessionId').equals(sessionId).toArray(),
+        db.zicardUserNotes.where('sessionId').equals(sessionId).toArray(),
+      ])
+
     return {
-      sessionId,
+      app: 'misisle-zicard',
+      version: 1,
       exportedAt: Date.now(),
-      sessions: [],
-      messages: [],
-      libraries: [],
-      fragments: [],
-      traces: [],
-      diaries: [],
+      type: 'session',
+      data: {
+        sessions: [session],
+        messages,
+        libraries,
+        fragments,
+        diaries,
+        traces,
+        userNotes,
+      },
     }
   },
 }))
+
