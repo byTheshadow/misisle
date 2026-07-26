@@ -47,18 +47,67 @@ export const useCharactersStore = create<CharactersState>((set, get) => ({
     }))
   },
 
-  deleteCharacter: async (id) => {
-    await db.characters.delete(id)
-    // 同时删除关联数据
-    await db.chats.where('characterId').equals(id).delete()
-    await db.memories.where('characterId').equals(id).delete()
-    await db.zicardLibraries.where('characterId').equals(id).delete()
+    deleteCharacter: async (id) => {
+    await db.transaction(
+      'rw',
+      db.characters,
+      db.chats,
+      db.chatMessages,
+      db.memories,
+      db.zicardLibraries,
+      db.zicardFragments,
+      db.zicardSessions,
+      db.zicardMessages,
+      db.zicardUserNotes,
+      db.zicardTraces,
+      db.zicardDiaries,
+      async () => {
+        await db.characters.delete(id)
+
+        const chats = await db.chats.where('characterId').equals(id).toArray()
+        const chatIds = chats.map((chat) => chat.id)
+
+        if (chatIds.length > 0) {
+          await db.chatMessages.where('chatId').anyOf(chatIds).delete()
+          await db.chats.where('id').anyOf(chatIds).delete()
+        }
+
+        await db.memories.where('characterId').equals(id).delete()
+
+        // 只删除绑定到该角色的字卡库；通用字卡库 characterId = null，不删除。
+        const boundLibraries = await db.zicardLibraries
+          .where('characterId')
+          .equals(id)
+          .toArray()
+
+        const boundLibraryIds = boundLibraries.map((library) => library.id)
+
+        if (boundLibraryIds.length > 0) {
+          await db.zicardFragments.where('libraryId').anyOf(boundLibraryIds).delete()
+          await db.zicardUserNotes.where('libraryId').anyOf(boundLibraryIds).delete()
+          await db.zicardLibraries.where('id').anyOf(boundLibraryIds).delete()
+        }
+
+        // 删除引用该全局角色的字卡会话。
+        const zicardSessions = await db.zicardSessions
+          .where('characterId')
+          .equals(id)
+          .toArray()
+
+        const zicardSessionIds = zicardSessions.map((session) => session.id)
+
+        if (zicardSessionIds.length > 0) {
+          await db.zicardMessages.where('sessionId').anyOf(zicardSessionIds).delete()
+          await db.zicardTraces.where('sessionId').anyOf(zicardSessionIds).delete()
+          await db.zicardDiaries.where('sessionId').anyOf(zicardSessionIds).delete()
+          await db.zicardUserNotes.where('sessionId').anyOf(zicardSessionIds).delete()
+          await db.zicardSessions.where('id').anyOf(zicardSessionIds).delete()
+        }
+      }
+    )
+
     set((state) => ({
       characters: state.characters.filter((c) => c.id !== id),
     }))
-  },
-
-  getCharacter: (id) => {
-    return get().characters.find((c) => c.id === id)
   },
 }))

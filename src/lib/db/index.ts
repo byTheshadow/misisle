@@ -10,11 +10,15 @@ import type {
   ZicardFragment,
   ZicardMessage,
   ZicardUserNote,
+  ZicardSession,
+  ZicardTrace,
+  ZicardDiaryEntry,
   KnowledgeBase,
   KnowledgeEntry,
   GlobalSettings,
   WidgetConfig,
 } from '@/types'
+
 
 export class MisisleDB extends Dexie {
   // 表定义
@@ -25,9 +29,12 @@ export class MisisleDB extends Dexie {
   chats!: Table<Chat>
   chatMessages!: Table<ChatMessage>
   zicardLibraries!: Table<ZicardLibrary>
-  zicardFragments!: Table<ZicardFragment>
-  zicardMessages!: Table<ZicardMessage>
-  zicardUserNotes!: Table<ZicardUserNote>
+zicardFragments!: Table<ZicardFragment>
+zicardSessions!: Table<ZicardSession>
+zicardMessages!: Table<ZicardMessage>
+zicardUserNotes!: Table<ZicardUserNote>
+zicardTraces!: Table<ZicardTrace>
+zicardDiaries!: Table<ZicardDiaryEntry>
   knowledgeBases!: Table<KnowledgeBase>
   knowledgeEntries!: Table<KnowledgeEntry>
   settings!: Table<GlobalSettings & { id: string }>
@@ -71,6 +78,46 @@ export class MisisleDB extends Dexie {
     })
   }
 }
+
+    this.version(2).stores({
+      // AI 配置
+      aiProviders: 'id, name, createdAt',
+
+      // 用户身份
+      userIdentities: 'id, name, isRealSelf, createdAt',
+
+      // 角色
+      characters: 'id, name, createdAt, updatedAt',
+
+      // 记忆
+      memories: 'id, characterId, chatId, type, userIdentityId, importance, createdAt',
+
+      // 聊天
+      chats: 'id, characterId, userIdentityId, mode, lastMessageAt, createdAt',
+      chatMessages: 'id, chatId, role, createdAt',
+
+      // 字卡 V2
+      zicardLibraries: 'id, characterId, scope, createdAt, updatedAt',
+      zicardFragments: 'id, libraryId, kind, position, category, enabled, createdAt, updatedAt',
+      zicardSessions:
+        'id, characterSource, characterId, userIdentityId, lastMessageAt, createdAt, updatedAt',
+      zicardMessages:
+        'id, sessionId, sender, type, responseGroupId, deletedAt, createdAt, updatedAt',
+      zicardUserNotes: 'id, sessionId, libraryId, createdAt',
+      zicardTraces: 'id, sessionId, source, pinned, canEcho, createdAt, updatedAt',
+      zicardDiaries: 'id, sessionId, source, createdAt, updatedAt',
+
+      // 知识库
+      knowledgeBases: 'id, name, createdAt',
+      knowledgeEntries: 'id, knowledgeBaseId, createdAt',
+
+      // 设置
+      settings: 'id',
+
+      // Widget 配置
+      widgets: 'id, type, visible',
+    })
+
 
 export const db = new MisisleDB()
 

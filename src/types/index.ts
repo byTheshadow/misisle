@@ -126,14 +126,60 @@ export interface ChatMessage {
   isRead: boolean
   createdAt: number
 }
-
 // ============================================
 // 字卡系统
 // ============================================
+
+export type ZicardConnectionMode = 'deep_random' | 'keyword_random'
+
+export type ZicardCharacterSource = 'global_character' | 'zicard_local'
+
+export type ZicardLibraryScope = 'global' | 'character_bound'
+
+export type ZicardKind =
+  | 'text'
+  | 'image'
+  | 'voice'
+  | 'status'
+  | 'diary'
+  | 'system'
+
+export type ZicardMessageSender = 'user' | 'character' | 'system'
+
+export type ZicardMessageType =
+  | 'text'
+  | 'image-card'
+  | 'voice-card'
+  | 'zicard-request'
+  | 'status'
+  | 'system'
+
+export type ZicardTraceSource =
+  | 'user_message'
+  | 'past_event'
+  | 'manual_note'
+
+export type ZicardDiarySource =
+  | 'manual'
+  | 'message'
+  | 'zicard'
+  | 'trace'
+  | 'random'
+
 export interface ZicardLibrary {
   id: string
-  characterId: string
+
+  /**
+   * null = 通用字卡库，不跟角色删除
+   * string = 绑定到某个全局角色，角色删除时可级联删除
+   */
+  characterId: string | null
+
   name: string
+  description: string
+
+  scope: ZicardLibraryScope
+
   createdAt: number
   updatedAt: number
 
@@ -141,44 +187,230 @@ export interface ZicardLibrary {
     enableKeywordTrigger: boolean
     autoWeather: boolean
     manualWeather: string
+
     replyDelayMin: number
     replyDelayMax: number
+
+    allowMultiBubble: boolean
+    allowCombinedBubble: boolean
   }
 }
 
 export interface ZicardFragment {
   id: string
   libraryId: string
-  position: 'opening' | 'middle' | 'ending'
+
+  kind: ZicardKind
+
+  /**
+   * 用于可选拼接。
+   * single/any 更适合现在的“单张字卡 / 多张气泡”模式。
+   */
+  position: 'single' | 'opening' | 'middle' | 'ending' | 'any'
+
   text: string
+
+  /**
+   * 图片式字卡：SVG 占位图标 + 翻转文字
+   */
+  imageIcon?: 'moon' | 'rain' | 'cloud' | 'letter' | 'window' | 'flower' | 'star'
+  imageBackText?: string
+
+  /**
+   * 语音式字卡：假的语音气泡 + 文本转写
+   */
+  voiceDuration?: number
+  voiceTranscript?: string
+
+  category: string
   tags: string[]
   weight: number
+  enabled: boolean
+
   conditions: {
     timeSlots: string[]
     weather: string[]
     dates: string[]
     keywords: string[]
   }
+
+  createdAt: number
+  updatedAt: number
+}
+
+export interface ZicardSession {
+  id: string
+
+  characterSource: ZicardCharacterSource
+
+  /**
+   * characterSource = global_character 时使用
+   */
+  characterId: string | null
+
+  /**
+   * characterSource = zicard_local 时使用
+   */
+  localCharacter: {
+    name: string
+    avatar: string
+    personality: string
+    description: string
+  } | null
+
+  userIdentityId: string | null
+
+  title: string
+  avatar: string
+
+  libraryIds: string[]
+
+  mode: ZicardConnectionMode
+
+  typingIndicatorText: string
+
+  replyDelay: {
+    type: 'instant' | 'fixed' | 'random'
+    fixedMinutes: number
+    minMinutes: number
+    maxMinutes: number
+  }
+
+  theme: {
+    background: string
+    userBubble: string
+    characterBubble: string
+    textColor: string
+  }
+
+  todayStatus: {
+    content: string
+    zicardId: string | null
+    drawnAt: number
+  } | null
+
+  lastMessage: string
+  lastMessageAt: number
+  unreadCount: number
+
   createdAt: number
   updatedAt: number
 }
 
 export interface ZicardMessage {
   id: string
-  libraryId: string
-  role: 'user' | 'zicard'
+  sessionId: string
+
+  sender: ZicardMessageSender
+  type: ZicardMessageType
+
   content: string
-  fragmentIds: string[]
+
+  zicardIds: string[]
+
+  /**
+   * 用于“部分合并 / 多条气泡”时归属同一次回应
+   */
+  responseGroupId: string | null
+
+  /**
+   * 消息引用
+   */
+  quote: {
+    messageId: string
+    sender: ZicardMessageSender
+    content: string
+  } | null
+
+  imageIcon?: string
+  imageBackText?: string
+
+  voiceDuration?: number
+  voiceTranscript?: string
+
+  requestAction?: {
+    kind: 'save_user_message_as_zicard'
+    sourceMessageId: string
+    status: 'pending' | 'accepted' | 'rejected'
+  }
+
+  isRead: boolean
+
+  /**
+   * 软删除，便于导出/恢复。
+   */
+  deletedAt: number | null
+
   createdAt: number
+  updatedAt: number
+}
+
+export interface ZicardTrace {
+  id: string
+  sessionId: string
+
+  source: ZicardTraceSource
+  sourceMessageId: string | null
+
+  content: string
+  excerpt: string
+
+  tags: string[]
+
+  pinned: boolean
+  canEcho: boolean
+
+  createdAt: number
+  updatedAt: number
+}
+
+export interface ZicardDiaryEntry {
+  id: string
+  sessionId: string
+
+  title: string
+  content: string
+
+  source: ZicardDiarySource
+  sourceId: string | null
+
+  mood: string
+  tags: string[]
+
+  createdAt: number
+  updatedAt: number
 }
 
 export interface ZicardUserNote {
   id: string
-  libraryId: string
+  sessionId: string
+  libraryId: string | null
+
   content: string
   keywords: string[]
+
   createdAt: number
+  updatedAt: number
 }
+
+export interface ZicardExportPackage {
+  app: 'misisle-zicard'
+  version: number
+  exportedAt: number
+
+  type: 'session' | 'library' | 'all'
+
+  data: {
+    sessions?: ZicardSession[]
+    messages?: ZicardMessage[]
+    libraries?: ZicardLibrary[]
+    fragments?: ZicardFragment[]
+    diaries?: ZicardDiaryEntry[]
+    traces?: ZicardTrace[]
+    userNotes?: ZicardUserNote[]
+  }
+}
+
 
 // ============================================
 // 知识库
