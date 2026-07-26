@@ -14,18 +14,6 @@ import type {
   KnowledgeEntry,
   GlobalSettings,
   WidgetConfig,
-  NovelRPConversation,
-  NovelRPMessage,
-  CharacterDiary,
-  DivinationReading,
-  TodoItem,
-  VocabularyItem,
-  VocabularySettings,
-  HomeProfileCard,
-  HomeTogetherWidget,
-  HomeImageWidget,
-  HomeMessageBoardConfig,
-  HomeMessageBoardItem,
 } from '@/types'
 
 export class MisisleDB extends Dexie {
@@ -45,19 +33,6 @@ export class MisisleDB extends Dexie {
   settings!: Table<GlobalSettings & { id: string }>
   widgets!: Table<WidgetConfig>
 
-  novelRPConversations!: Table<NovelRPConversation>
-  novelRPMessages!: Table<NovelRPMessage>
-  characterDiaries!: Table<CharacterDiary>
-  divinationReadings!: Table<DivinationReading>
-  todoItems!: Table<TodoItem>
-  vocabularyItems!: Table<VocabularyItem>
-  vocabularySettings!: Table<VocabularySettings>
-  homeProfileCards!: Table<HomeProfileCard>
-  homeTogetherWidgets!: Table<HomeTogetherWidget>
-  homeImageWidgets!: Table<HomeImageWidget>
-  homeMessageBoardConfigs!: Table<HomeMessageBoardConfig>
-  homeMessageBoardItems!: Table<HomeMessageBoardItem>
-
   constructor() {
     super('MisisleDB')
 
@@ -72,7 +47,8 @@ export class MisisleDB extends Dexie {
       characters: 'id, name, createdAt, updatedAt',
 
       // 记忆（按角色、聊天、类型索引）
-      memories: 'id, characterId, chatId, type, userIdentityId, importance, createdAt',
+      memories:
+        'id, characterId, chatId, type, userIdentityId, importance, createdAt',
 
       // 聊天
       chats: 'id, characterId, userIdentityId, mode, lastMessageAt, createdAt',
@@ -93,35 +69,11 @@ export class MisisleDB extends Dexie {
 
       // Widget 配置
       widgets: 'id, type, visible',
-
-      // 小说 RP
-      novelRPConversations:
-        'id, userIdentityId, lastMessageAt, createdAt, updatedAt',
-      novelRPMessages: 'id, conversationId, speakerCharacterId, createdAt',
-
-      // 角色日记
-      characterDiaries: 'id, characterId, date, createdAt, updatedAt',
-
-      // 塔罗 / 雷诺曼
-      divinationReadings: 'id, deckType, spreadId, createdAt, updatedAt',
-
-      // TodoList
-      todoItems:
-        'id, completed, dueAt, remindAt, source, characterId, createdAt, updatedAt',
-
-      // 背单词
-      vocabularyItems: 'id, word, language, familiarity, createdAt, updatedAt',
-      vocabularySettings: 'id, updatedAt',
-
-      // 首页美化组件
-      homeProfileCards: 'id, updatedAt',
-      homeTogetherWidgets: 'id, updatedAt',
-      homeImageWidgets: 'id, variant, updatedAt',
-      homeMessageBoardConfigs: 'id, mode, updatedAt',
-      homeMessageBoardItems: 'id, characterId, source, createdAt',
     })
   }
 }
+
+export const db = new MisisleDB()
 
 export function createDefaultSettings(): GlobalSettings {
   return {
@@ -201,13 +153,13 @@ export function createDefaultSettings(): GlobalSettings {
         startDate: '2024-01-01',
         leftAvatarUrl: '',
         rightAvatarUrl: '',
-        note: '仅作为首页美化组件，不绑定真实关系。',
+        note: '',
       },
       images: {
         largeImageUrl: '',
         smallImageUrl: '',
-        largeTitle: '大图组件',
-        smallTitle: '小图组件',
+        largeTitle: '',
+        smallTitle: '',
       },
       messageBoard: {
         mode: 'ai',
@@ -218,17 +170,25 @@ export function createDefaultSettings(): GlobalSettings {
   }
 }
 
-
 // 初始化默认设置
 export async function initDefaultSettings(): Promise<void> {
   const existing = await db.settings.get('global')
+  const defaults = createDefaultSettings()
 
   if (!existing) {
-     await db.settings.put({
+    await db.settings.put({
+      id: 'global',
+      ...defaults,
+    })
+    return
+  }
+
+  // 兼容旧数据：已有 settings 时补齐新增字段，避免 settings.ai / settings.home 未定义报错
+  await db.settings.put({
     ...existing,
     theme: {
       ...defaults.theme,
-      ...existing.theme,
+      ...(existing.theme ?? {}),
       cssVariables: {
         ...defaults.theme.cssVariables,
         ...(existing.theme?.cssVariables ?? {}),
@@ -236,7 +196,15 @@ export async function initDefaultSettings(): Promise<void> {
     },
     bubble: {
       ...defaults.bubble,
-      ...existing.bubble,
+      ...(existing.bubble ?? {}),
+      character: {
+        ...defaults.bubble.character,
+        ...(existing.bubble?.character ?? {}),
+      },
+      user: {
+        ...defaults.bubble.user,
+        ...(existing.bubble?.user ?? {}),
+      },
     },
     ai: {
       ...defaults.ai,
@@ -248,7 +216,7 @@ export async function initDefaultSettings(): Promise<void> {
     },
     notifications: {
       ...defaults.notifications,
-      ...existing.notifications,
+      ...(existing.notifications ?? {}),
       modules: {
         ...defaults.notifications.modules,
         ...(existing.notifications?.modules ?? {}),
@@ -256,15 +224,15 @@ export async function initDefaultSettings(): Promise<void> {
     },
     memory: {
       ...defaults.memory,
-      ...existing.memory,
+      ...(existing.memory ?? {}),
     },
     sync: {
       ...defaults.sync,
-      ...existing.sync,
+      ...(existing.sync ?? {}),
     },
     zicard: {
       ...defaults.zicard,
-      ...existing.zicard,
+      ...(existing.zicard ?? {}),
     },
     home: {
       ...defaults.home,
@@ -287,53 +255,4 @@ export async function initDefaultSettings(): Promise<void> {
       },
     },
   })
-
-
-  // 兼容旧数据：已有 settings 时补齐新增字段，避免 settings.ai 未定义报错
-  const defaults = createDefaultSettings()
-
-  await db.settings.put({
-    ...existing,
-    theme: {
-      ...defaults.theme,
-      ...existing.theme,
-      cssVariables: {
-        ...defaults.theme.cssVariables,
-        ...(existing.theme?.cssVariables ?? {}),
-      },
-    },
-    bubble: {
-      ...defaults.bubble,
-      ...existing.bubble,
-    },
-    ai: {
-      ...defaults.ai,
-      ...(existing.ai ?? {}),
-    },
-    backgroundTriggers: {
-      ...defaults.backgroundTriggers,
-      ...(existing.backgroundTriggers ?? {}),
-    },
-    notifications: {
-      ...defaults.notifications,
-      ...existing.notifications,
-      modules: {
-        ...defaults.notifications.modules,
-        ...(existing.notifications?.modules ?? {}),
-      },
-    },
-    memory: {
-      ...defaults.memory,
-      ...existing.memory,
-    },
-    sync: {
-      ...defaults.sync,
-      ...existing.sync,
-    },
-    zicard: {
-      ...defaults.zicard,
-      ...existing.zicard,
-    },
-  })
 }
-
