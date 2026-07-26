@@ -1,4 +1,3 @@
-// src/lib/stores/characters.ts
 import { create } from 'zustand'
 import { db } from '@/lib/db'
 import type { Character } from '@/types'
@@ -47,7 +46,7 @@ export const useCharactersStore = create<CharactersState>((set, get) => ({
     }))
   },
 
-    deleteCharacter: async (id) => {
+  deleteCharacter: async (id) => {
     await db.transaction(
       'rw',
       db.characters,
@@ -64,8 +63,9 @@ export const useCharactersStore = create<CharactersState>((set, get) => ({
       async () => {
         await db.characters.delete(id)
 
-        const chats = await db.chats.where('characterId').equals(id).toArray()
-        const chatIds = chats.map((chat) => chat.id)
+        const chatIds = (
+          await db.chats.where('characterId').equals(id).toArray()
+        ).map((chat) => chat.id)
 
         if (chatIds.length > 0) {
           await db.chatMessages.where('chatId').anyOf(chatIds).delete()
@@ -74,13 +74,9 @@ export const useCharactersStore = create<CharactersState>((set, get) => ({
 
         await db.memories.where('characterId').equals(id).delete()
 
-        // 只删除绑定到该角色的字卡库；通用字卡库 characterId = null，不删除。
-        const boundLibraries = await db.zicardLibraries
-          .where('characterId')
-          .equals(id)
-          .toArray()
-
-        const boundLibraryIds = boundLibraries.map((library) => library.id)
+        const boundLibraryIds = (
+          await db.zicardLibraries.where('characterId').equals(id).toArray()
+        ).map((library) => library.id)
 
         if (boundLibraryIds.length > 0) {
           await db.zicardFragments.where('libraryId').anyOf(boundLibraryIds).delete()
@@ -88,20 +84,16 @@ export const useCharactersStore = create<CharactersState>((set, get) => ({
           await db.zicardLibraries.where('id').anyOf(boundLibraryIds).delete()
         }
 
-        // 删除引用该全局角色的字卡会话。
-        const zicardSessions = await db.zicardSessions
-          .where('characterId')
-          .equals(id)
-          .toArray()
+        const sessionIds = (
+          await db.zicardSessions.where('characterId').equals(id).toArray()
+        ).map((session) => session.id)
 
-        const zicardSessionIds = zicardSessions.map((session) => session.id)
-
-        if (zicardSessionIds.length > 0) {
-          await db.zicardMessages.where('sessionId').anyOf(zicardSessionIds).delete()
-          await db.zicardTraces.where('sessionId').anyOf(zicardSessionIds).delete()
-          await db.zicardDiaries.where('sessionId').anyOf(zicardSessionIds).delete()
-          await db.zicardUserNotes.where('sessionId').anyOf(zicardSessionIds).delete()
-          await db.zicardSessions.where('id').anyOf(zicardSessionIds).delete()
+        if (sessionIds.length > 0) {
+          await db.zicardMessages.where('sessionId').anyOf(sessionIds).delete()
+          await db.zicardTraces.where('sessionId').anyOf(sessionIds).delete()
+          await db.zicardDiaries.where('sessionId').anyOf(sessionIds).delete()
+          await db.zicardUserNotes.where('sessionId').anyOf(sessionIds).delete()
+          await db.zicardSessions.where('id').anyOf(sessionIds).delete()
         }
       }
     )
@@ -109,5 +101,9 @@ export const useCharactersStore = create<CharactersState>((set, get) => ({
     set((state) => ({
       characters: state.characters.filter((c) => c.id !== id),
     }))
+  },
+
+  getCharacter: (id) => {
+    return get().characters.find((c) => c.id === id)
   },
 }))
