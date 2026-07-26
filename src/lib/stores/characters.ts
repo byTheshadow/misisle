@@ -46,21 +46,34 @@ export const useCharactersStore = create<CharactersState>((set, get) => ({
     }))
   },
 
-  deleteCharacter: async (id) => {
+      deleteCharacter: async (id) => {
     await db.transaction(
       'rw',
-      db.characters,
-      db.chats,
-      db.chatMessages,
-      db.memories,
-      db.zicardLibraries,
-      db.zicardFragments,
-      db.zicardSessions,
-      db.zicardMessages,
-      db.zicardUserNotes,
-      db.zicardTraces,
-      db.zicardDiaries,
+      [
+        db.characters,
+        db.chats,
+        db.chatMessages,
+        db.memories,
+        db.zicardLibraries,
+        db.zicardFragments,
+        db.zicardSessions,
+        db.zicardMessages,
+        db.zicardUserNotes,
+        db.zicardTraces,
+        db.zicardDiaries,
+      ],
       async () => {
+        await db.characters.delete(id)
+
+        // 后续原有删除逻辑保持不变
+      }
+    )
+
+    set((state) => ({
+      characters: state.characters.filter((c) => c.id !== id),
+    }))
+  },
+
         await db.characters.delete(id)
 
         const chatIds = (
