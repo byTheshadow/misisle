@@ -64,6 +64,10 @@ export default function ZicardPage() {
       void loadCharacters()
     }
   }, [isLoaded, charactersLoaded, loadAll, loadCharacters])
+  const visibleMessages = useMemo(
+    () => messages.filter((message) => !message.deletedAt),
+    [messages]
+  )
 
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({
@@ -72,10 +76,6 @@ export default function ZicardPage() {
     })
   }, [visibleMessages.length, isTyping, currentSession?.id])
 
-  const visibleMessages = useMemo(
-    () => messages.filter((message) => !message.deletedAt),
-    [messages]
-  )
 
   const currentLibraries = useMemo(() => {
     if (!currentSession) return []
