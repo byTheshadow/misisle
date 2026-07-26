@@ -161,11 +161,14 @@ export function HomeWidgets() {
   }
 
   async function updateProfileImage(target: ImageTarget, value: string) {
+    if (!home) return
+
     await updateHomeProfile({
       ...home.profile,
       [target === 'avatar' ? 'avatarUrl' : 'backgroundUrl']: value,
     })
   }
+
 
   async function handleFileChange(
     event: ChangeEvent<HTMLInputElement>,
