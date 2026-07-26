@@ -1,33 +1,35 @@
 'use client'
 
 import Link from 'next/link'
-import {
-  ChangeEvent,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { ChangeEvent, useMemo, useRef, useState } from 'react'
 import { useSettingsStore } from '@/lib/stores/settings'
-import type { HomeProfileSettings } from '@/types'
+import type {
+  HomeImageSettings,
+  HomeProfileSettings,
+  HomeTogetherSettings,
+} from '@/types'
 
-type ImageTarget = 'avatar' | 'background'
+type ImageTarget =
+  | 'profileAvatar'
+  | 'profileBackground'
+  | 'togetherLeftAvatar'
+  | 'togetherRightAvatar'
+  | 'largeImage'
+  | 'smallImage'
+
+type TextEditorTarget = 'profile' | 'together' | 'images'
 
 function getTogetherDays(startDate: string) {
   const start = new Date(startDate)
   const startTime = start.getTime()
 
-  if (Number.isNaN(startTime)) {
-    return 1
-  }
+  if (Number.isNaN(startTime)) return 1
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-
   start.setHours(0, 0, 0, 0)
 
-  const difference = today.getTime() - start.getTime()
-  return Math.max(1, Math.floor(difference / 86_400_000) + 1)
+  return Math.max(1, Math.floor((today.getTime() - start.getTime()) / 86_400_000) + 1)
 }
 
 function ImageIcon({ className }: { className?: string }) {
@@ -137,13 +139,14 @@ export function HomeWidgets() {
   const {
     settings,
     updateHomeProfile,
+    updateHomeTogether,
+    updateHomeImages,
   } = useSettingsStore()
 
-  const avatarInputRef = useRef<HTMLInputElement>(null)
-  const backgroundInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [isProfileEditorOpen, setIsProfileEditorOpen] = useState(false)
   const [imageTarget, setImageTarget] = useState<ImageTarget | null>(null)
+  const [textEditorTarget, setTextEditorTarget] = useState<TextEditorTarget | null>(null)
 
   const home = settings?.home
 
@@ -160,24 +163,44 @@ export function HomeWidgets() {
     )
   }
 
-  async function updateProfileImage(target: ImageTarget, value: string) {
+  async function saveImage(target: ImageTarget, value: string) {
     if (!home) return
 
-    await updateHomeProfile({
-      ...home.profile,
-      [target === 'avatar' ? 'avatarUrl' : 'backgroundUrl']: value,
-    })
+    if (target === 'profileAvatar') {
+      await updateHomeProfile({ ...home.profile, avatarUrl: value })
+      return
+    }
+
+    if (target === 'profileBackground') {
+      await updateHomeProfile({ ...home.profile, backgroundUrl: value })
+      return
+    }
+
+    if (target === 'togetherLeftAvatar') {
+      await updateHomeTogether({ ...home.together, leftAvatarUrl: value })
+      return
+    }
+
+    if (target === 'togetherRightAvatar') {
+      await updateHomeTogether({ ...home.together, rightAvatarUrl: value })
+      return
+    }
+
+    if (target === 'largeImage') {
+      await updateHomeImages({ ...home.images, largeImageUrl: value })
+      return
+    }
+
+    if (target === 'smallImage') {
+      await updateHomeImages({ ...home.images, smallImageUrl: value })
+    }
   }
 
-
-  async function handleFileChange(
-    event: ChangeEvent<HTMLInputElement>,
-    target: ImageTarget
-  ) {
+  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     event.target.value = ''
 
-    if (!file) return
+    if (!file || !imageTarget) return
 
     if (!file.type.startsWith('image/')) {
       window.alert('请选择图片文件。')
@@ -188,31 +211,29 @@ export function HomeWidgets() {
 
     reader.onload = () => {
       const result = reader.result
-
       if (typeof result === 'string') {
-        void updateProfileImage(target, result)
+        void saveImage(imageTarget, result)
       }
     }
 
     reader.readAsDataURL(file)
   }
 
+  function openFilePicker(target: ImageTarget) {
+    setImageTarget(target)
+    window.setTimeout(() => {
+      fileInputRef.current?.click()
+    }, 0)
+  }
+
   return (
     <>
       <input
-        ref={avatarInputRef}
+        ref={fileInputRef}
         type="file"
         accept="image/*"
         className="hidden"
-        onChange={(event) => void handleFileChange(event, 'avatar')}
-      />
-
-      <input
-        ref={backgroundInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(event) => void handleFileChange(event, 'background')}
+        onChange={(event) => void handleFileChange(event)}
       />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
@@ -220,16 +241,16 @@ export function HomeWidgets() {
         <article className="glass relative min-h-[272px] overflow-hidden rounded-[28px] border border-white/10 lg:col-span-7">
           <button
             type="button"
-            onClick={() => setImageTarget('background')}
-            className="group absolute inset-x-0 top-0 h-[142px] overflow-hidden text-left"
-            aria-label="更换主页背景图"
+            onClick={() => setImageTarget('profileBackground')}
+            className="absolute inset-x-0 top-0 h-[146px] overflow-hidden text-left"
+            aria-label="更换背景图"
           >
             {home.profile.backgroundUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={home.profile.backgroundUrl}
                 alt=""
-                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                className="h-full w-full object-cover transition-transform duration-500 hover:scale-[1.03]"
               />
             ) : (
               <div className="h-full w-full bg-[radial-gradient(circle_at_18%_8%,rgba(255,255,255,0.18),transparent_27%),radial-gradient(circle_at_74%_92%,rgba(255,255,255,0.08),transparent_35%),linear-gradient(135deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02))]" />
@@ -240,18 +261,18 @@ export function HomeWidgets() {
 
           <button
             type="button"
-            onClick={() => setIsProfileEditorOpen(true)}
-            className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/20 text-mist-text backdrop-blur-md transition-colors hover:bg-black/35"
-            aria-label="编辑主页资料"
+            onClick={() => setTextEditorTarget('profile')}
+            className="absolute right-4 top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/25 text-mist-text backdrop-blur-md transition-colors hover:bg-black/40"
+            aria-label="编辑主页文字"
           >
             <EditIcon className="h-4 w-4" />
           </button>
 
-          <div className="relative flex min-h-[272px] flex-col justify-end p-5 pt-[116px]">
+          <div className="relative z-10 flex min-h-[272px] flex-col justify-end p-5 pt-[116px]">
             <div className="flex items-end gap-4">
               <button
                 type="button"
-                onClick={() => setImageTarget('avatar')}
+                onClick={() => setImageTarget('profileAvatar')}
                 className="group relative h-20 w-20 shrink-0 overflow-hidden rounded-[24px] border border-white/20 bg-white/[0.09] shadow-xl"
                 aria-label="更换头像"
               >
@@ -275,7 +296,7 @@ export function HomeWidgets() {
 
               <button
                 type="button"
-                onClick={() => setIsProfileEditorOpen(true)}
+                onClick={() => setTextEditorTarget('profile')}
                 className="min-w-0 pb-1 text-left"
               >
                 <h2 className="truncate text-xl font-light text-mist-text">
@@ -292,13 +313,29 @@ export function HomeWidgets() {
         {/* 在一起天数 */}
         <article className="glass flex min-h-[272px] flex-col justify-between rounded-[28px] border border-white/10 p-5 lg:col-span-5">
           <div className="flex items-start justify-between">
-            <p className="text-xs tracking-wide text-mist-text-secondary">
+            <button
+              type="button"
+              onClick={() => setTextEditorTarget('together')}
+              className="text-left text-xs tracking-wide text-mist-text-secondary transition-colors hover:text-mist-text"
+            >
               {home.together.title}
-            </p>
-            <CalendarIcon className="h-5 w-5 text-mist-text-secondary" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setTextEditorTarget('together')}
+              className="text-mist-text-secondary transition-colors hover:text-mist-text"
+              aria-label="编辑天数组件"
+            >
+              <CalendarIcon className="h-5 w-5" />
+            </button>
           </div>
 
-          <div className="mt-8">
+          <button
+            type="button"
+            onClick={() => setTextEditorTarget('together')}
+            className="mt-8 text-left"
+          >
             <div className="flex items-end gap-2">
               <span className="text-6xl font-light leading-none tracking-[-0.06em] text-mist-text">
                 {togetherDays}
@@ -311,11 +348,18 @@ export function HomeWidgets() {
                 {home.together.note}
               </p>
             )}
-          </div>
+          </button>
 
           <div className="mt-6 flex items-center">
-            <Avatar imageUrl={home.together.leftAvatarUrl} />
-            <Avatar imageUrl={home.together.rightAvatarUrl} overlap />
+            <AvatarButton
+              imageUrl={home.together.leftAvatarUrl}
+              onClick={() => setImageTarget('togetherLeftAvatar')}
+            />
+            <AvatarButton
+              imageUrl={home.together.rightAvatarUrl}
+              overlap
+              onClick={() => setImageTarget('togetherRightAvatar')}
+            />
           </div>
         </article>
 
@@ -348,57 +392,69 @@ export function HomeWidgets() {
           </div>
         </Link>
 
-        {/* 大图 */}
         <ImageCard
           imageUrl={home.images.largeImageUrl}
           title={home.images.largeTitle}
+          onImageClick={() => setImageTarget('largeImage')}
+          onTextClick={() => setTextEditorTarget('images')}
           className="lg:col-span-3"
         />
 
-        {/* 小图 */}
         <ImageCard
           imageUrl={home.images.smallImageUrl}
           title={home.images.smallTitle}
+          onImageClick={() => setImageTarget('smallImage')}
+          onTextClick={() => setTextEditorTarget('images')}
           className="lg:col-span-3"
         />
       </div>
 
-      {isProfileEditorOpen && (
-        <ProfileTextEditor
-          profile={home.profile}
-          onClose={() => setIsProfileEditorOpen(false)}
-          onSave={async (profile) => {
-            await updateHomeProfile(profile)
-            setIsProfileEditorOpen(false)
+      {imageTarget && (
+        <ImageSourceDialog
+          title="图片"
+          currentUrl={getCurrentImageValue(imageTarget, home)}
+          onClose={() => setImageTarget(null)}
+          onChooseFile={() => openFilePicker(imageTarget)}
+          onSaveUrl={async (url) => {
+            await saveImage(imageTarget, url)
+            setImageTarget(null)
+          }}
+          onRemove={async () => {
+            await saveImage(imageTarget, '')
+            setImageTarget(null)
           }}
         />
       )}
 
-      {imageTarget && (
-        <ImageSourceDialog
-          title={imageTarget === 'avatar' ? '更换头像' : '更换背景图'}
-          currentUrl={
-            imageTarget === 'avatar'
-              ? home.profile.avatarUrl
-              : home.profile.backgroundUrl
-          }
-          onClose={() => setImageTarget(null)}
-          onChooseFile={() => {
-            if (imageTarget === 'avatar') {
-              avatarInputRef.current?.click()
-            } else {
-              backgroundInputRef.current?.click()
-            }
+      {textEditorTarget === 'profile' && (
+        <ProfileTextEditor
+          profile={home.profile}
+          onClose={() => setTextEditorTarget(null)}
+          onSave={async (profile) => {
+            await updateHomeProfile(profile)
+            setTextEditorTarget(null)
+          }}
+        />
+      )}
 
-            setImageTarget(null)
+      {textEditorTarget === 'together' && (
+        <TogetherTextEditor
+          together={home.together}
+          onClose={() => setTextEditorTarget(null)}
+          onSave={async (together) => {
+            await updateHomeTogether(together)
+            setTextEditorTarget(null)
           }}
-          onSaveUrl={async (url) => {
-            await updateProfileImage(imageTarget, url)
-            setImageTarget(null)
-          }}
-          onRemove={async () => {
-            await updateProfileImage(imageTarget, '')
-            setImageTarget(null)
+        />
+      )}
+
+      {textEditorTarget === 'images' && (
+        <ImagesTextEditor
+          images={home.images}
+          onClose={() => setTextEditorTarget(null)}
+          onSave={async (images) => {
+            await updateHomeImages(images)
+            setTextEditorTarget(null)
           }}
         />
       )}
@@ -406,19 +462,36 @@ export function HomeWidgets() {
   )
 }
 
-function Avatar({
+function getCurrentImageValue(
+  target: ImageTarget,
+  home: NonNullable<ReturnType<typeof useSettingsStore.getState>['settings']>['home']
+) {
+  if (target === 'profileAvatar') return home.profile.avatarUrl
+  if (target === 'profileBackground') return home.profile.backgroundUrl
+  if (target === 'togetherLeftAvatar') return home.together.leftAvatarUrl
+  if (target === 'togetherRightAvatar') return home.together.rightAvatarUrl
+  if (target === 'largeImage') return home.images.largeImageUrl
+  return home.images.smallImageUrl
+}
+
+function AvatarButton({
   imageUrl,
   overlap = false,
+  onClick,
 }: {
   imageUrl: string
   overlap?: boolean
+  onClick: () => void
 }) {
   return (
-    <div
+    <button
+      type="button"
+      onClick={onClick}
       className={[
-        'flex h-14 w-14 items-center justify-center overflow-hidden rounded-[20px] border border-white/15 bg-white/[0.06] text-mist-text-secondary',
+        'group relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-[20px] border border-white/15 bg-white/[0.06] text-mist-text-secondary',
         overlap ? '-ml-3' : '',
       ].join(' ')}
+      aria-label="更换图片"
     >
       {imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -426,17 +499,25 @@ function Avatar({
       ) : (
         <ImageIcon className="h-5 w-5" />
       )}
-    </div>
+
+      <span className="absolute inset-0 flex items-center justify-center bg-black/35 opacity-0 transition-opacity group-hover:opacity-100">
+        <EditIcon className="h-4 w-4 text-white" />
+      </span>
+    </button>
   )
 }
 
 function ImageCard({
   imageUrl,
   title,
+  onImageClick,
+  onTextClick,
   className,
 }: {
   imageUrl: string
   title: string
+  onImageClick: () => void
+  onTextClick: () => void
   className?: string
 }) {
   return (
@@ -446,96 +527,34 @@ function ImageCard({
         className ?? '',
       ].join(' ')}
     >
-      {imageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={imageUrl} alt={title} className="h-[196px] w-full object-cover" />
-      ) : (
-        <div className="flex h-[196px] items-end bg-[linear-gradient(135deg,rgba(255,255,255,0.07),rgba(255,255,255,0.015))] p-5">
-          <div>
-            <ImageIcon className="h-6 w-6 text-mist-text-secondary" />
-            <p className="mt-3 text-sm text-mist-text-secondary">{title}</p>
+      <button
+        type="button"
+        onClick={onImageClick}
+        className="group block h-[150px] w-full overflow-hidden text-left"
+        aria-label="更换图片"
+      >
+        {imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={imageUrl}
+            alt={title}
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center bg-[linear-gradient(135deg,rgba(255,255,255,0.07),rgba(255,255,255,0.015))] text-mist-text-secondary">
+            <ImageIcon className="h-7 w-7" />
           </div>
-        </div>
-      )}
+        )}
+      </button>
+
+      <button
+        type="button"
+        onClick={onTextClick}
+        className="block w-full px-4 py-3 text-left"
+      >
+        <p className="truncate text-sm text-mist-text-secondary">{title}</p>
+      </button>
     </article>
-  )
-}
-
-function ProfileTextEditor({
-  profile,
-  onClose,
-  onSave,
-}: {
-  profile: HomeProfileSettings
-  onClose: () => void
-  onSave: (profile: HomeProfileSettings) => Promise<void>
-}) {
-  const [displayName, setDisplayName] = useState(profile.displayName)
-  const [signature, setSignature] = useState(profile.signature)
-  const [isSaving, setIsSaving] = useState(false)
-
-  async function handleSave() {
-    setIsSaving(true)
-
-    try {
-      await onSave({
-        ...profile,
-        displayName: displayName.trim() || '我的主页',
-        signature: signature.trim(),
-      })
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
-      <div className="glass w-full max-w-md rounded-[28px] border border-white/10 p-5">
-        <div className="mb-6">
-          <h2 className="text-lg font-light text-mist-text">编辑主页</h2>
-        </div>
-
-        <div className="space-y-4">
-          <label className="block">
-            <span className="text-xs text-mist-text-secondary">名字</span>
-            <input
-              value={displayName}
-              onChange={(event) => setDisplayName(event.target.value)}
-              className="mt-2 w-full rounded-2xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-mist-text outline-none transition-colors placeholder:text-mist-text-secondary/50 focus:border-white/25"
-            />
-          </label>
-
-          <label className="block">
-            <span className="text-xs text-mist-text-secondary">签名</span>
-            <textarea
-              value={signature}
-              onChange={(event) => setSignature(event.target.value)}
-              rows={3}
-              className="mt-2 w-full resize-none rounded-2xl border border-white/10 bg-black/15 px-4 py-3 text-sm leading-6 text-mist-text outline-none transition-colors placeholder:text-mist-text-secondary/50 focus:border-white/25"
-            />
-          </label>
-        </div>
-
-        <div className="mt-6 flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-2xl px-4 py-2 text-sm text-mist-text-secondary transition-colors hover:text-mist-text"
-          >
-            取消
-          </button>
-
-          <button
-            type="button"
-            onClick={() => void handleSave()}
-            disabled={isSaving}
-            className="rounded-2xl border border-white/10 bg-white/[0.12] px-4 py-2 text-sm text-mist-text transition-colors hover:bg-white/[0.17] disabled:opacity-60"
-          >
-            {isSaving ? '保存中' : '保存'}
-          </button>
-        </div>
-      </div>
-    </div>
   )
 }
 
@@ -557,19 +576,11 @@ function ImageSourceDialog({
   const [url, setUrl] = useState(currentUrl)
   const [isSaving, setIsSaving] = useState(false)
 
-  useEffect(() => {
-    setUrl(currentUrl)
-  }, [currentUrl])
-
   async function handleSaveUrl() {
     const normalizedUrl = url.trim()
-
-    if (!normalizedUrl) {
-      return
-    }
+    if (!normalizedUrl) return
 
     setIsSaving(true)
-
     try {
       await onSaveUrl(normalizedUrl)
     } finally {
@@ -579,7 +590,6 @@ function ImageSourceDialog({
 
   async function handleRemove() {
     setIsSaving(true)
-
     try {
       await onRemove()
     } finally {
@@ -597,7 +607,7 @@ function ImageSourceDialog({
           onClick={onChooseFile}
           className="mt-5 flex w-full items-center justify-center rounded-2xl border border-white/10 bg-white/[0.08] px-4 py-3 text-sm text-mist-text transition-colors hover:bg-white/[0.13]"
         >
-          从设备选择图片
+          从设备选择
         </button>
 
         <div className="my-5 flex items-center gap-3">
@@ -607,7 +617,7 @@ function ImageSourceDialog({
         </div>
 
         <label className="block">
-          <span className="text-xs text-mist-text-secondary">图片 URL</span>
+          <span className="text-xs text-mist-text-secondary">URL</span>
           <input
             value={url}
             onChange={(event) => setUrl(event.target.value)}
@@ -651,5 +661,225 @@ function ImageSourceDialog({
         </div>
       </div>
     </div>
+  )
+}
+
+function ProfileTextEditor({
+  profile,
+  onClose,
+  onSave,
+}: {
+  profile: HomeProfileSettings
+  onClose: () => void
+  onSave: (profile: HomeProfileSettings) => Promise<void>
+}) {
+  const [displayName, setDisplayName] = useState(profile.displayName)
+  const [signature, setSignature] = useState(profile.signature)
+  const [isSaving, setIsSaving] = useState(false)
+
+  async function handleSave() {
+    setIsSaving(true)
+    try {
+      await onSave({
+        ...profile,
+        displayName: displayName.trim() || '我的主页',
+        signature: signature.trim(),
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <Modal title="编辑主页" onClose={onClose}>
+      <div className="space-y-4">
+        <TextInput label="名字" value={displayName} onChange={setDisplayName} />
+        <TextArea label="签名" value={signature} onChange={setSignature} />
+      </div>
+
+      <ModalActions onClose={onClose} onSave={handleSave} isSaving={isSaving} />
+    </Modal>
+  )
+}
+
+function TogetherTextEditor({
+  together,
+  onClose,
+  onSave,
+}: {
+  together: HomeTogetherSettings
+  onClose: () => void
+  onSave: (together: HomeTogetherSettings) => Promise<void>
+}) {
+  const [title, setTitle] = useState(together.title)
+  const [startDate, setStartDate] = useState(together.startDate)
+  const [note, setNote] = useState(together.note)
+  const [isSaving, setIsSaving] = useState(false)
+
+  async function handleSave() {
+    setIsSaving(true)
+    try {
+      await onSave({
+        ...together,
+        title: title.trim() || '第',
+        startDate: startDate.trim() || '2024-01-01',
+        note: note.trim(),
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <Modal title="编辑天数" onClose={onClose}>
+      <div className="space-y-4">
+        <TextInput label="标题" value={title} onChange={setTitle} />
+        <TextInput label="起始日期" value={startDate} onChange={setStartDate} />
+        <TextArea label="短句" value={note} onChange={setNote} />
+      </div>
+
+      <ModalActions onClose={onClose} onSave={handleSave} isSaving={isSaving} />
+    </Modal>
+  )
+}
+
+function ImagesTextEditor({
+  images,
+  onClose,
+  onSave,
+}: {
+  images: HomeImageSettings
+  onClose: () => void
+  onSave: (images: HomeImageSettings) => Promise<void>
+}) {
+  const [largeTitle, setLargeTitle] = useState(images.largeTitle)
+  const [smallTitle, setSmallTitle] = useState(images.smallTitle)
+  const [isSaving, setIsSaving] = useState(false)
+
+  async function handleSave() {
+    setIsSaving(true)
+    try {
+      await onSave({
+        ...images,
+        largeTitle: largeTitle.trim() || '图片',
+        smallTitle: smallTitle.trim() || '图片',
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <Modal title="编辑图片标题" onClose={onClose}>
+      <div className="space-y-4">
+        <TextInput label="大图标题" value={largeTitle} onChange={setLargeTitle} />
+        <TextInput label="小图标题" value={smallTitle} onChange={setSmallTitle} />
+      </div>
+
+      <ModalActions onClose={onClose} onSave={handleSave} isSaving={isSaving} />
+    </Modal>
+  )
+}
+
+function Modal({
+  title,
+  children,
+  onClose,
+}: {
+  title: string
+  children: React.ReactNode
+  onClose: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
+      <div className="glass w-full max-w-md rounded-[28px] border border-white/10 p-5">
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="text-lg font-light text-mist-text">{title}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-sm text-mist-text-secondary transition-colors hover:text-mist-text"
+          >
+            关闭
+          </button>
+        </div>
+
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function ModalActions({
+  onClose,
+  onSave,
+  isSaving,
+}: {
+  onClose: () => void
+  onSave: () => Promise<void>
+  isSaving: boolean
+}) {
+  return (
+    <div className="mt-6 flex justify-end gap-3">
+      <button
+        type="button"
+        onClick={onClose}
+        className="rounded-2xl px-4 py-2 text-sm text-mist-text-secondary transition-colors hover:text-mist-text"
+      >
+        取消
+      </button>
+
+      <button
+        type="button"
+        onClick={() => void onSave()}
+        disabled={isSaving}
+        className="rounded-2xl border border-white/10 bg-white/[0.12] px-4 py-2 text-sm text-mist-text transition-colors hover:bg-white/[0.17] disabled:opacity-60"
+      >
+        {isSaving ? '保存中' : '保存'}
+      </button>
+    </div>
+  )
+}
+
+function TextInput({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <label className="block">
+      <span className="text-xs text-mist-text-secondary">{label}</span>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-2 w-full rounded-2xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-mist-text outline-none placeholder:text-mist-text-secondary/50 focus:border-white/25"
+      />
+    </label>
+  )
+}
+
+function TextArea({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <label className="block">
+      <span className="text-xs text-mist-text-secondary">{label}</span>
+      <textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        rows={3}
+        className="mt-2 w-full resize-none rounded-2xl border border-white/10 bg-black/15 px-4 py-3 text-sm leading-6 text-mist-text outline-none placeholder:text-mist-text-secondary/50 focus:border-white/25"
+      />
+    </label>
   )
 }
