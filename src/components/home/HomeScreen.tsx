@@ -15,29 +15,23 @@ export function HomeScreen() {
   }, [isLoaded, loadSettings])
 
   return (
-    <main className="min-h-screen p-6 pb-12">
-      <header className="mb-6">
-        <p className="text-xs tracking-[0.35em] text-mist-text-secondary uppercase">
+    <main className="min-h-screen px-5 py-6 sm:px-8 sm:py-8 lg:px-10">
+      <header className="mb-8">
+        <p className="text-[11px] uppercase tracking-[0.32em] text-mist-text-secondary">
           Misisle
         </p>
-        <h1 className="text-3xl font-light text-mist-text mt-2">雾屿</h1>
-        <p className="text-sm text-mist-text-secondary mt-2">
-          一座安静的数字小家。
-        </p>
+        <h1 className="mt-2 text-3xl font-light tracking-tight text-mist-text">
+          雾屿
+        </h1>
       </header>
 
-      <section className="mb-8">
+      <section className="mb-10">
         <HomeWidgets />
       </section>
 
       <section>
-        <div className="flex items-end justify-between mb-4">
-          <div>
-            <h2 className="text-lg font-light text-mist-text">应用</h2>
-            <p className="text-xs text-mist-text-secondary mt-1">
-              进入不同房间，继续你的陪伴生态。
-            </p>
-          </div>
+        <div className="mb-4">
+          <h2 className="text-lg font-light text-mist-text">应用</h2>
         </div>
 
         <AppGrid />
@@ -45,3 +39,4 @@ export function HomeScreen() {
     </main>
   )
 }
+

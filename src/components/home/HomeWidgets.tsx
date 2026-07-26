@@ -1,39 +1,77 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import Link from 'next/link'
+import {
+  ChangeEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { useSettingsStore } from '@/lib/stores/settings'
 import type { HomeProfileSettings } from '@/types'
 
-function getTogetherDays(startDate: string) {
-  const start = new Date(startDate).getTime()
+type ImageTarget = 'avatar' | 'background'
 
-  if (Number.isNaN(start)) {
+function getTogetherDays(startDate: string) {
+  const start = new Date(startDate)
+  const startTime = start.getTime()
+
+  if (Number.isNaN(startTime)) {
     return 1
   }
 
-  const diff = Date.now() - start
-  return Math.max(1, Math.floor(diff / 86_400_000) + 1)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  start.setHours(0, 0, 0, 0)
+
+  const difference = today.getTime() - start.getTime()
+  return Math.max(1, Math.floor(difference / 86_400_000) + 1)
 }
 
-function ImageFallbackIcon({ className }: { className?: string }) {
+function ImageIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <path
-        d="M5.2 6.1c0-1.1.9-2 2-2h9.6c1.1 0 2 .9 2 2v11.8c0 1.1-.9 2-2 2H7.2c-1.1 0-2-.9-2-2V6.1Z"
+      <rect
+        x="4.5"
+        y="4.5"
+        width="15"
+        height="15"
+        rx="3"
         stroke="currentColor"
         strokeWidth="1.5"
       />
       <path
-        d="m7.8 16 2.9-3.2 2.2 2.3 1.5-1.6 1.8 2.5"
+        d="m7.4 16.2 3.1-3.4 2.4 2.5 1.6-1.8 2.1 2.7"
         stroke="currentColor"
         strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
       <path
-        d="M9 8.6h.1"
+        d="M9 8.8h.1"
         stroke="currentColor"
         strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+function EditIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path
+        d="m5.2 18.8 3.1-.7L18 8.4a2.1 2.1 0 0 0-3-3l-9.7 9.7-.7 3.1.6.6Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path
+        d="m13.8 6.6 3.6 3.6"
+        stroke="currentColor"
+        strokeWidth="1.5"
         strokeLinecap="round"
       />
     </svg>
@@ -50,7 +88,7 @@ function MessageIcon({ className }: { className?: string }) {
         strokeLinejoin="round"
       />
       <path
-        d="M8.5 8.8h7M8.5 11.7h4.8"
+        d="M8.5 8.9h7M8.5 11.8h4.7"
         stroke="currentColor"
         strokeWidth="1.5"
         strokeLinecap="round"
@@ -59,16 +97,34 @@ function MessageIcon({ className }: { className?: string }) {
   )
 }
 
-function CalendarIcon({ className }: { className?: string }) {
+function ArrowIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
       <path
-        d="M6.8 5.2h10.4c1.1 0 2 .9 2 2v10.2c0 1.1-.9 2-2 2H6.8c-1.1 0-2-.9-2-2V7.2c0-1.1.9-2 2-2Z"
+        d="M5.5 12h12M13.5 7.5 18 12l-4.5 4.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function CalendarIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <rect
+        x="4.8"
+        y="5.8"
+        width="14.4"
+        height="13.4"
+        rx="2.4"
         stroke="currentColor"
         strokeWidth="1.5"
       />
       <path
-        d="M8.2 4v3M15.8 4v3M5.2 9h13.6"
+        d="M8 4.3v3M16 4.3v3M4.8 9.5h14.4"
         stroke="currentColor"
         strokeWidth="1.5"
         strokeLinecap="round"
@@ -78,171 +134,268 @@ function CalendarIcon({ className }: { className?: string }) {
 }
 
 export function HomeWidgets() {
-  const { settings, updateHomeProfile } = useSettingsStore()
-  const [isEditingProfile, setIsEditingProfile] = useState(false)
+  const {
+    settings,
+    updateHomeProfile,
+  } = useSettingsStore()
+
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+  const backgroundInputRef = useRef<HTMLInputElement>(null)
+
+  const [isProfileEditorOpen, setIsProfileEditorOpen] = useState(false)
+  const [imageTarget, setImageTarget] = useState<ImageTarget | null>(null)
 
   const home = settings?.home
 
-  const togetherDays = useMemo(() => {
-    return getTogetherDays(home?.together.startDate ?? '2024-01-01')
-  }, [home?.together.startDate])
+  const togetherDays = useMemo(
+    () => getTogetherDays(home?.together.startDate ?? '2024-01-01'),
+    [home?.together.startDate]
+  )
 
   if (!home) {
     return (
-      <div className="glass rounded-3xl p-6">
-        <p className="text-sm text-mist-text-secondary">正在加载首页配置……</p>
+      <div className="glass rounded-[28px] border border-white/10 px-5 py-6">
+        <div className="h-5 w-28 animate-pulse rounded-full bg-white/[0.08]" />
       </div>
     )
   }
 
+  async function updateProfileImage(target: ImageTarget, value: string) {
+    await updateHomeProfile({
+      ...home.profile,
+      [target === 'avatar' ? 'avatarUrl' : 'backgroundUrl']: value,
+    })
+  }
+
+  async function handleFileChange(
+    event: ChangeEvent<HTMLInputElement>,
+    target: ImageTarget
+  ) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      window.alert('请选择图片文件。')
+      return
+    }
+
+    const reader = new FileReader()
+
+    reader.onload = () => {
+      const result = reader.result
+
+      if (typeof result === 'string') {
+        void updateProfileImage(target, result)
+      }
+    }
+
+    reader.readAsDataURL(file)
+  }
+
   return (
     <>
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <article className="glass rounded-[28px] overflow-hidden lg:col-span-7 min-h-[260px] border border-white/10">
-          <div className="relative h-32 bg-white/[0.04]">
+      <input
+        ref={avatarInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(event) => void handleFileChange(event, 'avatar')}
+      />
+
+      <input
+        ref={backgroundInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(event) => void handleFileChange(event, 'background')}
+      />
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+        {/* User 主页卡 */}
+        <article className="glass relative min-h-[272px] overflow-hidden rounded-[28px] border border-white/10 lg:col-span-7">
+          <button
+            type="button"
+            onClick={() => setImageTarget('background')}
+            className="group absolute inset-x-0 top-0 h-[142px] overflow-hidden text-left"
+            aria-label="更换主页背景图"
+          >
             {home.profile.backgroundUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={home.profile.backgroundUrl}
                 alt=""
-                className="absolute inset-0 w-full h-full object-cover"
+                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
               />
             ) : (
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.16),transparent_28%),linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))]" />
+              <div className="h-full w-full bg-[radial-gradient(circle_at_18%_8%,rgba(255,255,255,0.18),transparent_27%),radial-gradient(circle_at_74%_92%,rgba(255,255,255,0.08),transparent_35%),linear-gradient(135deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02))]" />
             )}
 
-            <div className="absolute inset-0 bg-gradient-to-b from-black/5 to-black/35" />
-          </div>
+            <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-black/5 to-black/45" />
+          </button>
 
-          <div className="p-5 -mt-10 relative">
-            <div className="flex items-end justify-between gap-4">
-              <div className="flex items-end gap-4 min-w-0">
-                <div className="w-20 h-20 rounded-[24px] bg-white/[0.08] border border-white/15 overflow-hidden flex items-center justify-center text-mist-text shadow-xl">
-                  {home.profile.avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={home.profile.avatarUrl}
-                      alt={home.profile.displayName}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <ImageFallbackIcon className="w-8 h-8 opacity-70" />
-                  )}
-                </div>
+          <button
+            type="button"
+            onClick={() => setIsProfileEditorOpen(true)}
+            className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/20 text-mist-text backdrop-blur-md transition-colors hover:bg-black/35"
+            aria-label="编辑主页资料"
+          >
+            <EditIcon className="h-4 w-4" />
+          </button>
 
-                <div className="pb-1 min-w-0">
-                  <h2 className="text-xl text-mist-text font-light truncate">
-                    {home.profile.displayName}
-                  </h2>
-                  <p className="text-sm text-mist-text-secondary mt-1 line-clamp-2">
-                    {home.profile.signature}
-                  </p>
-                </div>
-              </div>
+          <div className="relative flex min-h-[272px] flex-col justify-end p-5 pt-[116px]">
+            <div className="flex items-end gap-4">
+              <button
+                type="button"
+                onClick={() => setImageTarget('avatar')}
+                className="group relative h-20 w-20 shrink-0 overflow-hidden rounded-[24px] border border-white/20 bg-white/[0.09] shadow-xl"
+                aria-label="更换头像"
+              >
+                {home.profile.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={home.profile.avatarUrl}
+                    alt={home.profile.displayName}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="flex h-full w-full items-center justify-center text-mist-text-secondary">
+                    <ImageIcon className="h-7 w-7" />
+                  </span>
+                )}
+
+                <span className="absolute inset-0 flex items-center justify-center bg-black/35 opacity-0 transition-opacity group-hover:opacity-100">
+                  <EditIcon className="h-5 w-5 text-white" />
+                </span>
+              </button>
 
               <button
                 type="button"
-                onClick={() => setIsEditingProfile(true)}
-                className="shrink-0 rounded-2xl bg-white/[0.08] hover:bg-white/[0.12] border border-white/10 px-4 py-2 text-xs text-mist-text transition-colors"
+                onClick={() => setIsProfileEditorOpen(true)}
+                className="min-w-0 pb-1 text-left"
               >
-                编辑
+                <h2 className="truncate text-xl font-light text-mist-text">
+                  {home.profile.displayName}
+                </h2>
+                <p className="mt-1 line-clamp-2 text-sm leading-6 text-mist-text-secondary">
+                  {home.profile.signature}
+                </p>
               </button>
             </div>
-
-            <div className="mt-6 grid grid-cols-3 gap-3">
-              <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-3">
-                <p className="text-[11px] text-mist-text-secondary">头像</p>
-                <p className="text-sm text-mist-text mt-1">
-                  {home.profile.avatarUrl ? '已设置' : '未设置'}
-                </p>
-              </div>
-
-              <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-3">
-                <p className="text-[11px] text-mist-text-secondary">背景</p>
-                <p className="text-sm text-mist-text mt-1">
-                  {home.profile.backgroundUrl ? '已设置' : '未设置'}
-                </p>
-              </div>
-
-              <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-3">
-                <p className="text-[11px] text-mist-text-secondary">签名</p>
-                <p className="text-sm text-mist-text mt-1">
-                  {home.profile.signature ? '已设置' : '未设置'}
-                </p>
-              </div>
-            </div>
           </div>
         </article>
 
-        <article className="glass rounded-[28px] p-5 lg:col-span-5 min-h-[260px] border border-white/10 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-mist-text-secondary">
-                {home.together.title}
-              </p>
-              <CalendarIcon className="w-5 h-5 text-mist-text-secondary" />
-            </div>
+        {/* 在一起天数 */}
+        <article className="glass flex min-h-[272px] flex-col justify-between rounded-[28px] border border-white/10 p-5 lg:col-span-5">
+          <div className="flex items-start justify-between">
+            <p className="text-xs tracking-wide text-mist-text-secondary">
+              {home.together.title}
+            </p>
+            <CalendarIcon className="h-5 w-5 text-mist-text-secondary" />
+          </div>
 
-            <div className="flex items-end gap-2 mt-4">
-              <span className="text-6xl font-light text-mist-text tracking-tight">
+          <div className="mt-8">
+            <div className="flex items-end gap-2">
+              <span className="text-6xl font-light leading-none tracking-[-0.06em] text-mist-text">
                 {togetherDays}
               </span>
-              <span className="text-sm text-mist-text-secondary mb-2">天</span>
+              <span className="mb-1 text-sm text-mist-text-secondary">天</span>
             </div>
 
-            <p className="text-sm text-mist-text-secondary mt-4 leading-6">
-              {home.together.note}
-            </p>
+            {home.together.note && (
+              <p className="mt-4 text-sm text-mist-text-secondary">
+                {home.together.note}
+              </p>
+            )}
           </div>
 
-          <div className="flex items-center mt-6">
-            <AvatarSlot imageUrl={home.together.leftAvatarUrl} />
-            <AvatarSlot imageUrl={home.together.rightAvatarUrl} overlap />
+          <div className="mt-6 flex items-center">
+            <Avatar imageUrl={home.together.leftAvatarUrl} />
+            <Avatar imageUrl={home.together.rightAvatarUrl} overlap />
           </div>
         </article>
 
-        <article className="glass rounded-[28px] p-5 lg:col-span-6 min-h-[190px] border border-white/10">
-          <div className="flex items-center justify-between">
+        {/* 留言板 */}
+        <Link
+          href="/home/message-board"
+          className="glass group min-h-[196px] rounded-[28px] border border-white/10 p-5 transition-colors hover:bg-white/[0.055] lg:col-span-6"
+        >
+          <div className="flex items-start justify-between">
             <div>
-              <h3 className="text-base text-mist-text font-light">AI 留言板</h3>
-              <p className="text-xs text-mist-text-secondary mt-1">
-                根据离开时间计算，支持 AI 生成或仅字卡。
+              <h3 className="text-base font-light text-mist-text">留言板</h3>
+              <p className="mt-1 text-xs text-mist-text-secondary">
+                {home.messageBoard.mode === 'ai' ? 'AI 留言' : '字卡留言'}
               </p>
             </div>
-            <MessageIcon className="w-5 h-5 text-mist-text-secondary" />
+
+            <MessageIcon className="h-5 w-5 text-mist-text-secondary" />
           </div>
 
-          <div className="mt-5 rounded-2xl bg-white/[0.04] border border-white/10 p-4">
-            <p className="text-sm text-mist-text leading-6">
-              这里会显示角色在你离开期间留下的内容。
+          <div className="mt-7 flex items-end justify-between gap-5">
+            <p className="max-w-sm text-sm leading-7 text-mist-text-secondary">
+              {home.messageBoard.selectedCharacterId
+                ? '离开的时候，也许会有人在这里留下一句话。'
+                : '选择一个角色，开始留下属于你们的消息。'}
             </p>
-            <p className="text-xs text-mist-text-secondary mt-3">
-              当前模式：
-              {home.messageBoard.mode === 'ai' ? 'AI 生成' : '仅字卡'}
-            </p>
-          </div>
-        </article>
 
-        <ImageWidget
-          title={home.images.largeTitle}
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-mist-text-secondary transition-colors group-hover:bg-white/[0.09] group-hover:text-mist-text">
+              <ArrowIcon className="h-4 w-4" />
+            </span>
+          </div>
+        </Link>
+
+        {/* 大图 */}
+        <ImageCard
           imageUrl={home.images.largeImageUrl}
+          title={home.images.largeTitle}
           className="lg:col-span-3"
         />
 
-        <ImageWidget
-          title={home.images.smallTitle}
+        {/* 小图 */}
+        <ImageCard
           imageUrl={home.images.smallImageUrl}
+          title={home.images.smallTitle}
           className="lg:col-span-3"
         />
       </div>
 
-      {isEditingProfile && (
-        <HomeProfileEditor
+      {isProfileEditorOpen && (
+        <ProfileTextEditor
           profile={home.profile}
-          onClose={() => setIsEditingProfile(false)}
+          onClose={() => setIsProfileEditorOpen(false)}
           onSave={async (profile) => {
             await updateHomeProfile(profile)
-            setIsEditingProfile(false)
+            setIsProfileEditorOpen(false)
+          }}
+        />
+      )}
+
+      {imageTarget && (
+        <ImageSourceDialog
+          title={imageTarget === 'avatar' ? '更换头像' : '更换背景图'}
+          currentUrl={
+            imageTarget === 'avatar'
+              ? home.profile.avatarUrl
+              : home.profile.backgroundUrl
+          }
+          onClose={() => setImageTarget(null)}
+          onChooseFile={() => {
+            if (imageTarget === 'avatar') {
+              avatarInputRef.current?.click()
+            } else {
+              backgroundInputRef.current?.click()
+            }
+
+            setImageTarget(null)
+          }}
+          onSaveUrl={async (url) => {
+            await updateProfileImage(imageTarget, url)
+            setImageTarget(null)
+          }}
+          onRemove={async () => {
+            await updateProfileImage(imageTarget, '')
+            setImageTarget(null)
           }}
         />
       )}
@@ -250,7 +403,7 @@ export function HomeWidgets() {
   )
 }
 
-function AvatarSlot({
+function Avatar({
   imageUrl,
   overlap = false,
 }: {
@@ -260,56 +413,52 @@ function AvatarSlot({
   return (
     <div
       className={[
-        'w-14 h-14 rounded-2xl bg-white/[0.06] border border-white/15 overflow-hidden flex items-center justify-center text-mist-text',
+        'flex h-14 w-14 items-center justify-center overflow-hidden rounded-[20px] border border-white/15 bg-white/[0.06] text-mist-text-secondary',
         overlap ? '-ml-3' : '',
       ].join(' ')}
     >
       {imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+        <img src={imageUrl} alt="" className="h-full w-full object-cover" />
       ) : (
-        <ImageFallbackIcon className="w-6 h-6 opacity-70" />
+        <ImageIcon className="h-5 w-5" />
       )}
     </div>
   )
 }
 
-function ImageWidget({
-  title,
+function ImageCard({
   imageUrl,
+  title,
   className,
 }: {
-  title: string
   imageUrl: string
+  title: string
   className?: string
 }) {
   return (
     <article
       className={[
-        'glass rounded-[28px] overflow-hidden min-h-[190px] border border-white/10',
+        'glass min-h-[196px] overflow-hidden rounded-[28px] border border-white/10',
         className ?? '',
       ].join(' ')}
     >
-      <div className="h-28 bg-white/[0.04] flex items-center justify-center text-mist-text-secondary">
-        {imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={imageUrl} alt={title} className="w-full h-full object-cover" />
-        ) : (
-          <ImageFallbackIcon className="w-8 h-8 opacity-70" />
-        )}
-      </div>
-
-      <div className="p-4">
-        <h3 className="text-sm text-mist-text">{title}</h3>
-        <p className="text-xs text-mist-text-secondary mt-1">
-          后续可在首页编辑中调整图片地址。
-        </p>
-      </div>
+      {imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={imageUrl} alt={title} className="h-[196px] w-full object-cover" />
+      ) : (
+        <div className="flex h-[196px] items-end bg-[linear-gradient(135deg,rgba(255,255,255,0.07),rgba(255,255,255,0.015))] p-5">
+          <div>
+            <ImageIcon className="h-6 w-6 text-mist-text-secondary" />
+            <p className="mt-3 text-sm text-mist-text-secondary">{title}</p>
+          </div>
+        </div>
+      )}
     </article>
   )
 }
 
-function HomeProfileEditor({
+function ProfileTextEditor({
   profile,
   onClose,
   onSave,
@@ -318,17 +467,18 @@ function HomeProfileEditor({
   onClose: () => void
   onSave: (profile: HomeProfileSettings) => Promise<void>
 }) {
-  const [draft, setDraft] = useState<HomeProfileSettings>(profile)
+  const [displayName, setDisplayName] = useState(profile.displayName)
+  const [signature, setSignature] = useState(profile.signature)
   const [isSaving, setIsSaving] = useState(false)
 
   async function handleSave() {
     setIsSaving(true)
+
     try {
       await onSave({
-        displayName: draft.displayName.trim() || '我的主页',
-        signature: draft.signature.trim(),
-        avatarUrl: draft.avatarUrl.trim(),
-        backgroundUrl: draft.backgroundUrl.trim(),
+        ...profile,
+        displayName: displayName.trim() || '我的主页',
+        signature: signature.trim(),
       })
     } finally {
       setIsSaving(false)
@@ -336,68 +486,38 @@ function HomeProfileEditor({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-xl glass rounded-[28px] border border-white/10 p-5">
-        <div className="flex items-start justify-between gap-4 mb-5">
-          <div>
-            <h2 className="text-lg text-mist-text font-light">编辑主页卡</h2>
-            <p className="text-xs text-mist-text-secondary mt-1">
-              这些内容会保存到本地设置中。
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/10 px-3 py-2 text-xs text-mist-text transition-colors"
-          >
-            关闭
-          </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
+      <div className="glass w-full max-w-md rounded-[28px] border border-white/10 p-5">
+        <div className="mb-6">
+          <h2 className="text-lg font-light text-mist-text">编辑主页</h2>
         </div>
 
         <div className="space-y-4">
-          <Field
-            label="显示名"
-            value={draft.displayName}
-            onChange={(value) =>
-              setDraft((current) => ({ ...current, displayName: value }))
-            }
-            placeholder="例如：我的主页"
-          />
+          <label className="block">
+            <span className="text-xs text-mist-text-secondary">名字</span>
+            <input
+              value={displayName}
+              onChange={(event) => setDisplayName(event.target.value)}
+              className="mt-2 w-full rounded-2xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-mist-text outline-none transition-colors placeholder:text-mist-text-secondary/50 focus:border-white/25"
+            />
+          </label>
 
-          <Field
-            label="个性签名"
-            value={draft.signature}
-            onChange={(value) =>
-              setDraft((current) => ({ ...current, signature: value }))
-            }
-            placeholder="写一句留在首页的话"
-          />
-
-          <Field
-            label="头像 URL"
-            value={draft.avatarUrl}
-            onChange={(value) =>
-              setDraft((current) => ({ ...current, avatarUrl: value }))
-            }
-            placeholder="https://..."
-          />
-
-          <Field
-            label="背景图 URL"
-            value={draft.backgroundUrl}
-            onChange={(value) =>
-              setDraft((current) => ({ ...current, backgroundUrl: value }))
-            }
-            placeholder="https://..."
-          />
+          <label className="block">
+            <span className="text-xs text-mist-text-secondary">签名</span>
+            <textarea
+              value={signature}
+              onChange={(event) => setSignature(event.target.value)}
+              rows={3}
+              className="mt-2 w-full resize-none rounded-2xl border border-white/10 bg-black/15 px-4 py-3 text-sm leading-6 text-mist-text outline-none transition-colors placeholder:text-mist-text-secondary/50 focus:border-white/25"
+            />
+          </label>
         </div>
 
-        <div className="flex justify-end gap-3 mt-6">
+        <div className="mt-6 flex justify-end gap-3">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-2xl bg-white/[0.05] hover:bg-white/[0.08] border border-white/10 px-4 py-2 text-sm text-mist-text transition-colors"
+            className="rounded-2xl px-4 py-2 text-sm text-mist-text-secondary transition-colors hover:text-mist-text"
           >
             取消
           </button>
@@ -406,7 +526,7 @@ function HomeProfileEditor({
             type="button"
             onClick={() => void handleSave()}
             disabled={isSaving}
-            className="rounded-2xl bg-white/[0.14] hover:bg-white/[0.18] border border-white/10 px-4 py-2 text-sm text-mist-text transition-colors disabled:opacity-60"
+            className="rounded-2xl border border-white/10 bg-white/[0.12] px-4 py-2 text-sm text-mist-text transition-colors hover:bg-white/[0.17] disabled:opacity-60"
           >
             {isSaving ? '保存中' : '保存'}
           </button>
@@ -416,26 +536,117 @@ function HomeProfileEditor({
   )
 }
 
-function Field({
-  label,
-  value,
-  onChange,
-  placeholder,
+function ImageSourceDialog({
+  title,
+  currentUrl,
+  onClose,
+  onChooseFile,
+  onSaveUrl,
+  onRemove,
 }: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  placeholder: string
+  title: string
+  currentUrl: string
+  onClose: () => void
+  onChooseFile: () => void
+  onSaveUrl: (url: string) => Promise<void>
+  onRemove: () => Promise<void>
 }) {
+  const [url, setUrl] = useState(currentUrl)
+  const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    setUrl(currentUrl)
+  }, [currentUrl])
+
+  async function handleSaveUrl() {
+    const normalizedUrl = url.trim()
+
+    if (!normalizedUrl) {
+      return
+    }
+
+    setIsSaving(true)
+
+    try {
+      await onSaveUrl(normalizedUrl)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  async function handleRemove() {
+    setIsSaving(true)
+
+    try {
+      await onRemove()
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   return (
-    <label className="block">
-      <span className="text-xs text-mist-text-secondary">{label}</span>
-      <input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        className="mt-2 w-full rounded-2xl bg-black/20 border border-white/10 px-4 py-3 text-sm text-mist-text outline-none focus:border-white/25 placeholder:text-mist-text-secondary/60"
-      />
-    </label>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
+      <div className="glass w-full max-w-md rounded-[28px] border border-white/10 p-5">
+        <h2 className="text-lg font-light text-mist-text">{title}</h2>
+
+        <button
+          type="button"
+          onClick={onChooseFile}
+          className="mt-5 flex w-full items-center justify-center rounded-2xl border border-white/10 bg-white/[0.08] px-4 py-3 text-sm text-mist-text transition-colors hover:bg-white/[0.13]"
+        >
+          从设备选择图片
+        </button>
+
+        <div className="my-5 flex items-center gap-3">
+          <div className="h-px flex-1 bg-white/10" />
+          <span className="text-[11px] text-mist-text-secondary">或</span>
+          <div className="h-px flex-1 bg-white/10" />
+        </div>
+
+        <label className="block">
+          <span className="text-xs text-mist-text-secondary">图片 URL</span>
+          <input
+            value={url}
+            onChange={(event) => setUrl(event.target.value)}
+            placeholder="https://..."
+            className="mt-2 w-full rounded-2xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-mist-text outline-none placeholder:text-mist-text-secondary/50 focus:border-white/25"
+          />
+        </label>
+
+        <div className="mt-6 flex items-center justify-between gap-3">
+          {currentUrl ? (
+            <button
+              type="button"
+              onClick={() => void handleRemove()}
+              disabled={isSaving}
+              className="text-sm text-mist-text-secondary transition-colors hover:text-mist-text disabled:opacity-60"
+            >
+              移除
+            </button>
+          ) : (
+            <span />
+          )}
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-2xl px-4 py-2 text-sm text-mist-text-secondary transition-colors hover:text-mist-text"
+            >
+              取消
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void handleSaveUrl()}
+              disabled={!url.trim() || isSaving}
+              className="rounded-2xl border border-white/10 bg-white/[0.12] px-4 py-2 text-sm text-mist-text transition-colors hover:bg-white/[0.17] disabled:opacity-50"
+            >
+              {isSaving ? '保存中' : '使用 URL'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }

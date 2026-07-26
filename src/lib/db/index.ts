@@ -47,8 +47,7 @@ export class MisisleDB extends Dexie {
       characters: 'id, name, createdAt, updatedAt',
 
       // 记忆（按角色、聊天、类型索引）
-      memories:
-        'id, characterId, chatId, type, userIdentityId, importance, createdAt',
+      memories: 'id, characterId, chatId, type, userIdentityId, importance, createdAt',
 
       // 聊天
       chats: 'id, characterId, userIdentityId, mode, lastMessageAt, createdAt',
@@ -158,12 +157,12 @@ export function createDefaultSettings(): GlobalSettings {
       images: {
         largeImageUrl: '',
         smallImageUrl: '',
-        largeTitle: '',
-        smallTitle: '',
+        largeTitle: '大图',
+        smallTitle: '小图',
       },
       messageBoard: {
         mode: 'ai',
-        selectedCharacterIds: [],
+        selectedCharacterId: null,
         lastSeenAt: Date.now(),
       },
     },
@@ -173,22 +172,23 @@ export function createDefaultSettings(): GlobalSettings {
 // 初始化默认设置
 export async function initDefaultSettings(): Promise<void> {
   const existing = await db.settings.get('global')
-  const defaults = createDefaultSettings()
 
   if (!existing) {
     await db.settings.put({
       id: 'global',
-      ...defaults,
+      ...createDefaultSettings(),
     })
     return
   }
 
   // 兼容旧数据：已有 settings 时补齐新增字段，避免 settings.ai / settings.home 未定义报错
+  const defaults = createDefaultSettings()
+
   await db.settings.put({
     ...existing,
     theme: {
       ...defaults.theme,
-      ...(existing.theme ?? {}),
+      ...existing.theme,
       cssVariables: {
         ...defaults.theme.cssVariables,
         ...(existing.theme?.cssVariables ?? {}),
@@ -196,7 +196,7 @@ export async function initDefaultSettings(): Promise<void> {
     },
     bubble: {
       ...defaults.bubble,
-      ...(existing.bubble ?? {}),
+      ...existing.bubble,
       character: {
         ...defaults.bubble.character,
         ...(existing.bubble?.character ?? {}),
@@ -216,7 +216,7 @@ export async function initDefaultSettings(): Promise<void> {
     },
     notifications: {
       ...defaults.notifications,
-      ...(existing.notifications ?? {}),
+      ...existing.notifications,
       modules: {
         ...defaults.notifications.modules,
         ...(existing.notifications?.modules ?? {}),
@@ -252,6 +252,10 @@ export async function initDefaultSettings(): Promise<void> {
       messageBoard: {
         ...defaults.home.messageBoard,
         ...(existing.home?.messageBoard ?? {}),
+        selectedCharacterId:
+          existing.home?.messageBoard?.selectedCharacterId ??
+          existing.home?.messageBoard?.selectedCharacterIds?.[0] ??
+          null,
       },
     },
   })

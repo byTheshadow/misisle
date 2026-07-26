@@ -484,6 +484,10 @@ export interface HomeImageSettings {
 
 export interface HomeMessageBoardSettings {
   mode: 'ai' | 'zicard'
-  selectedCharacterIds: string[]
+
+  // 从现有角色库中单选，不在留言板内创建角色
+  selectedCharacterId: string | null
+
+  // 用于后续根据离开时长生成/抽取留言
   lastSeenAt: number
 }
