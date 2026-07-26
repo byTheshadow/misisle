@@ -3,6 +3,50 @@ import { db } from '@/lib/db'
 import type { AIProvider } from '@/types'
 import { generateId } from '@/lib/utils/id'
 
+function normalizeBaseUrl(baseUrl: string): string {
+  return baseUrl.replace(/\/+$/, '')
+}
+
+function normalizeModelsResponse(data: unknown): string[] {
+  if (!data || typeof data !== 'object') return []
+
+  const record = data as Record<string, unknown>
+
+  // OpenAI compatible: { data: [{ id: 'xxx' }] }
+  if (Array.isArray(record.data)) {
+    return record.data
+      .map((item) => {
+        if (typeof item === 'string') return item
+        if (item && typeof item === 'object' && 'id' in item) {
+          return String((item as { id: unknown }).id)
+        }
+        if (item && typeof item === 'object' && 'name' in item) {
+          return String((item as { name: unknown }).name)
+        }
+        return ''
+      })
+      .filter(Boolean)
+  }
+
+  // Some providers: { models: [...] }
+  if (Array.isArray(record.models)) {
+    return record.models
+      .map((item) => {
+        if (typeof item === 'string') return item
+        if (item && typeof item === 'object' && 'id' in item) {
+          return String((item as { id: unknown }).id)
+        }
+        if (item && typeof item === 'object' && 'name' in item) {
+          return String((item as { name: unknown }).name)
+        }
+        return ''
+      })
+      .filter(Boolean)
+  }
+
+  return []
+}
+
 export async function createProvider(
   data: Omit<AIProvider, 'id' | 'models' | 'createdAt' | 'updatedAt'>
 ): Promise<AIProvider> {
@@ -10,6 +54,7 @@ export async function createProvider(
   const provider: AIProvider = {
     id: generateId(),
     ...data,
+    baseUrl: normalizeBaseUrl(data.baseUrl),
     models: [],
     createdAt: now,
     updatedAt: now,
@@ -24,6 +69,7 @@ export async function updateProvider(
 ): Promise<void> {
   await db.aiProviders.update(id, {
     ...data,
+    baseUrl: data.baseUrl ? normalizeBaseUrl(data.baseUrl) : data.baseUrl,
     updatedAt: Date.now(),
   })
 }
@@ -41,31 +87,47 @@ export async function getProvider(id: string): Promise<AIProvider | undefined> {
 }
 
 export async function fetchModels(provider: AIProvider): Promise<string[]> {
-  try {
-    const response = await fetch(`${provider.baseUrl}/models`, {
-      headers: {
-        Authorization: `Bearer ${provider.apiKey}`,
-      },
-    })
+  const baseUrl = normalizeBaseUrl(provider.baseUrl)
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch models: ${response.status}`)
+  const paths = ['/models', '/model']
+  let lastError: unknown = null
+
+  for (const path of paths) {
+    try {
+      const response = await fetch(`${baseUrl}${path}`, {
+        headers: provider.apiKey
+          ? {
+              Authorization: `Bearer ${provider.apiKey}`,
+            }
+          : undefined,
+      })
+
+      if (!response.ok) {
+        lastError = new Error(`Failed to fetch models from ${path}: ${response.status}`)
+        continue
+      }
+
+      const data = await response.json()
+      const models = normalizeModelsResponse(data)
+
+      await db.aiProviders.update(provider.id, {
+        models,
+        updatedAt: Date.now(),
+      })
+
+      return models
+    } catch (error) {
+      lastError = error
     }
-
-    const data = await response.json()
-    const models = data.data?.map((m: { id: string }) => m.id) || []
-
-    // 更新缓存
-    await db.aiProviders.update(provider.id, {
-      models,
-      updatedAt: Date.now(),
-    })
-
-    return models
-  } catch (error) {
-    console.error('Error fetching models:', error)
-    throw error
   }
+
+  console.error('Error fetching models:', lastError)
+  throw lastError instanceof Error ? lastError : new Error('Failed to fetch models')
+}
+
+export async function testProviderConnection(provider: AIProvider): Promise<boolean> {
+  const models = await fetchModels(provider)
+  return models.length >= 0
 }
 
 export interface ChatCompletionMessage {
@@ -86,13 +148,21 @@ export interface ChatCompletionOptions {
 export async function createChatCompletion(
   options: ChatCompletionOptions
 ): Promise<string> {
-  const { provider, model, messages, temperature = 0.7, maxTokens = 2000, stream = false, onStream } = options
+  const {
+    provider,
+    model,
+    messages,
+    temperature = 0.7,
+    maxTokens = 2000,
+    stream = false,
+    onStream,
+  } = options
 
-  const response = await fetch(`${provider.baseUrl}/chat/completions`, {
+  const response = await fetch(`${normalizeBaseUrl(provider.baseUrl)}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${provider.apiKey}`,
+      ...(provider.apiKey ? { Authorization: `Bearer ${provider.apiKey}` } : {}),
     },
     body: JSON.stringify({
       model,
@@ -112,8 +182,6 @@ export async function createChatCompletion(
     const reader = response.body?.getReader()
     const decoder = new TextDecoder()
     let fullContent = ''
-
-    // src/lib/ai/provider.ts（续）
 
     if (reader) {
       while (true) {

@@ -4,12 +4,14 @@ import { db } from '@/lib/db'
 import type { UserIdentity } from '@/types'
 import { generateId } from '@/lib/utils/id'
 
+type IdentityFormData = Omit<UserIdentity, 'id' | 'createdAt' | 'updatedAt'>
+
 interface IdentitiesState {
   identities: UserIdentity[]
   isLoaded: boolean
 
   loadIdentities: () => Promise<void>
-  createIdentity: (data: Omit<UserIdentity, 'id' | 'createdAt' | 'updatedAt'>) => Promise<UserIdentity>
+  createIdentity: (data: IdentityFormData) => Promise<UserIdentity>
   updateIdentity: (id: string, data: Partial<UserIdentity>) => Promise<void>
   deleteIdentity: (id: string) => Promise<void>
   getIdentity: (id: string) => UserIdentity | undefined
@@ -27,7 +29,7 @@ export const useIdentitiesStore = create<IdentitiesState>((set, get) => ({
 
   createIdentity: async (data) => {
     const now = Date.now()
-    
+
     // 如果设置为真实自己，取消其他身份的 isRealSelf
     if (data.isRealSelf) {
       await db.userIdentities.toCollection().modify({ isRealSelf: false })
@@ -40,27 +42,27 @@ export const useIdentitiesStore = create<IdentitiesState>((set, get) => ({
       updatedAt: now,
     }
     await db.userIdentities.add(identity)
-    
+
     if (data.isRealSelf) {
       const allIdentities = await db.userIdentities.toArray()
       set({ identities: allIdentities })
     } else {
       set((state) => ({ identities: [...state.identities, identity] }))
     }
-    
+
     return identity
   },
 
   updateIdentity: async (id, data) => {
     const updatedAt = Date.now()
-    
+
     // 如果设置为真实自己，取消其他身份的 isRealSelf
     if (data.isRealSelf) {
       await db.userIdentities.toCollection().modify({ isRealSelf: false })
     }
 
     await db.userIdentities.update(id, { ...data, updatedAt })
-    
+
     const allIdentities = await db.userIdentities.toArray()
     set({ identities: allIdentities })
   },

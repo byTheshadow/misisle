@@ -21,7 +21,6 @@ export interface UserIdentity {
   name: string
   avatar: string
   description: string
-  speakingStyle: string
   isRealSelf: boolean
   createdAt: number
   updatedAt: number
@@ -37,7 +36,7 @@ export interface Character {
   description: string
   createdAt: number
   updatedAt: number
-  
+
   // AI 配置
   ai: {
     providerId: string
@@ -48,10 +47,10 @@ export interface Character {
     temperature: number
     maxTokens: number
   }
-  
+
   // 气泡样式覆盖（null 表示使用全局默认）
   bubbleStyle: BubbleStyle | null
-  
+
   // 关联数据
   knowledgeBaseIds: string[]
   relationship: string
@@ -137,13 +136,13 @@ export interface ZicardLibrary {
   name: string
   createdAt: number
   updatedAt: number
-  
+
   settings: {
     enableKeywordTrigger: boolean
     autoWeather: boolean
     manualWeather: string
-    replyDelayMin: number  // 最小回复延迟（分钟）
-    replyDelayMax: number  // 最大回复延迟（分钟）
+    replyDelayMin: number
+    replyDelayMax: number
   }
 }
 
@@ -153,12 +152,12 @@ export interface ZicardFragment {
   position: 'opening' | 'middle' | 'ending'
   text: string
   tags: string[]
-  weight: number  // 权重，用于加权随机
+  weight: number
   conditions: {
-    timeSlots: string[]   // 'dawn' | 'morning' | 'afternoon' | 'evening' | 'night' | 'midnight'
-    weather: string[]     // 'sunny' | 'cloudy' | 'rainy' | 'snowy'
-    dates: string[]       // 特殊日期标识
-    keywords: string[]    // 触发关键词
+    timeSlots: string[]
+    weather: string[]
+    dates: string[]
+    keywords: string[]
   }
   createdAt: number
   updatedAt: number
@@ -169,7 +168,7 @@ export interface ZicardMessage {
   libraryId: string
   role: 'user' | 'zicard'
   content: string
-  fragmentIds: string[]  // 使用的碎片ID（zicard消息）
+  fragmentIds: string[]
   createdAt: number
 }
 
@@ -212,9 +211,22 @@ export interface GlobalSettings {
     customCSS: string
     cssVariables: Record<string, string>
   }
-  
+
   bubble: BubbleStyle
-  
+
+  ai: {
+    defaultChatProviderId: string
+    defaultChatModelId: string
+    defaultBackgroundProviderId: string
+    defaultBackgroundModelId: string
+  }
+
+  backgroundTriggers: {
+    enabled: boolean
+    intervalMinutes: number
+    useTodoTime: boolean
+  }
+
   notifications: {
     enabled: boolean
     quietHoursStart: string
@@ -228,12 +240,12 @@ export interface GlobalSettings {
       games: boolean
     }
   }
-  
+
   memory: {
-    autoExtractThreshold: number  // 自动提取的消息数阈值
-    maxTokensInPrompt: number     // 注入 Prompt 的最大 token
+    autoExtractThreshold: number
+    maxTokensInPrompt: number
   }
-  
+
   sync: {
     githubEnabled: boolean
     githubRepo: string
@@ -241,7 +253,7 @@ export interface GlobalSettings {
     autoSync: boolean
     syncIntervalMinutes: number
   }
-  
+
   zicard: {
     enableDailyRitual: boolean
     ritualDurationSeconds: number
@@ -258,3 +270,4 @@ export interface WidgetConfig {
   size: { width: number; height: number }
   visible: boolean
 }
+

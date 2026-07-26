@@ -13,6 +13,69 @@ export function SettingsGeneral() {
   return (
     <div className="space-y-4">
       <Card>
+        <h3 className="text-sm font-medium text-mist-text mb-4">后台触发</h3>
+
+        <div className="space-y-4">
+          <label className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              checked={settings.backgroundTriggers.enabled}
+              onChange={(e) =>
+                updateSettings({
+                  backgroundTriggers: {
+                    ...settings.backgroundTriggers,
+                    enabled: e.target.checked,
+                  },
+                })
+              }
+              className="w-4 h-4 rounded border-mist-border bg-white/5"
+            />
+            <span className="text-sm text-mist-text">启用后台自动触发</span>
+          </label>
+
+          <Input
+            label="自动触发间隔（分钟）"
+            type="number"
+            min="5"
+            step="5"
+            value={settings.backgroundTriggers.intervalMinutes}
+            disabled={!settings.backgroundTriggers.enabled}
+            onChange={(e) =>
+              updateSettings({
+                backgroundTriggers: {
+                  ...settings.backgroundTriggers,
+                  intervalMinutes: parseInt(e.target.value) || 60,
+                },
+              })
+            }
+          />
+
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              checked={settings.backgroundTriggers.useTodoTime}
+              disabled={!settings.backgroundTriggers.enabled}
+              onChange={(e) =>
+                updateSettings({
+                  backgroundTriggers: {
+                    ...settings.backgroundTriggers,
+                    useTodoTime: e.target.checked,
+                  },
+                })
+              }
+              className="w-4 h-4 mt-0.5 rounded border-mist-border bg-white/5"
+            />
+            <span className="text-sm text-mist-text">
+              根据 TodoList 任务时间触发
+              <span className="block text-xs text-mist-text-secondary mt-1">
+                当前先保存开关。TodoList 模块接入后，后台任务可根据待办事项的提醒时间或截止时间触发。
+              </span>
+            </span>
+          </label>
+        </div>
+      </Card>
+
+      <Card>
         <h3 className="text-sm font-medium text-mist-text mb-4">记忆系统</h3>
         <div className="space-y-4">
           <Input

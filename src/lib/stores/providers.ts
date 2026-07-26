@@ -1,6 +1,5 @@
 // src/lib/stores/providers.ts
 import { create } from 'zustand'
-import { db } from '@/lib/db'
 import type { AIProvider } from '@/types'
 import {
   createProvider as dbCreateProvider,
@@ -8,6 +7,7 @@ import {
   deleteProvider as dbDeleteProvider,
   getAllProviders,
   fetchModels as apiFetchModels,
+  testProviderConnection as apiTestProviderConnection,
 } from '@/lib/ai/provider'
 
 interface ProvidersState {
@@ -19,6 +19,7 @@ interface ProvidersState {
   updateProvider: (id: string, data: Partial<AIProvider>) => Promise<void>
   deleteProvider: (id: string) => Promise<void>
   fetchModels: (id: string) => Promise<string[]>
+  testConnection: (id: string) => Promise<boolean>
 }
 
 export const useProvidersStore = create<ProvidersState>((set, get) => ({
@@ -64,4 +65,13 @@ export const useProvidersStore = create<ProvidersState>((set, get) => ({
     }))
     return models
   },
+
+  testConnection: async (id) => {
+    const provider = get().providers.find((p) => p.id === id)
+    if (!provider) throw new Error('Provider not found')
+
+    await apiTestProviderConnection(provider)
+    return true
+  },
 }))
+

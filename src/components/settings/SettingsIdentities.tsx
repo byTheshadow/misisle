@@ -28,7 +28,6 @@ export function SettingsIdentities() {
     name: '',
     avatar: '',
     description: '',
-    speakingStyle: '',
     isRealSelf: false,
   })
 
@@ -45,7 +44,6 @@ export function SettingsIdentities() {
         name: identity.name,
         avatar: identity.avatar,
         description: identity.description,
-        speakingStyle: identity.speakingStyle,
         isRealSelf: identity.isRealSelf,
       })
     } else {
@@ -54,7 +52,6 @@ export function SettingsIdentities() {
         name: '',
         avatar: '',
         description: '',
-        speakingStyle: '',
         isRealSelf: false,
       })
     }
@@ -120,11 +117,6 @@ export function SettingsIdentities() {
                       {identity.description}
                     </p>
                   )}
-                  {identity.speakingStyle && (
-                    <p className="text-xs text-mist-text-secondary/70 mt-1">
-                      说话风格：{identity.speakingStyle}
-                    </p>
-                  )}
                 </div>
                 <div className="flex items-center gap-1">
                   <button
@@ -171,12 +163,6 @@ export function SettingsIdentities() {
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
           />
-          <Input
-            label="说话风格"
-            placeholder="例如：温柔、活泼、正式..."
-            value={formData.speakingStyle}
-            onChange={(e) => setFormData({ ...formData, speakingStyle: e.target.value })}
-          />
           <label className="flex items-center gap-3">
             <input
               type="checkbox"
@@ -197,3 +183,4 @@ export function SettingsIdentities() {
     </div>
   )
 }
+
