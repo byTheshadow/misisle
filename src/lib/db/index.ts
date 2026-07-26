@@ -19,7 +19,6 @@ import type {
   WidgetConfig,
 } from '@/types'
 
-
 export class MisisleDB extends Dexie {
   // 表定义
   aiProviders!: Table<AIProvider>
@@ -28,13 +27,16 @@ export class MisisleDB extends Dexie {
   memories!: Table<Memory>
   chats!: Table<Chat>
   chatMessages!: Table<ChatMessage>
+
+  // 字卡系统
   zicardLibraries!: Table<ZicardLibrary>
-zicardFragments!: Table<ZicardFragment>
-zicardSessions!: Table<ZicardSession>
-zicardMessages!: Table<ZicardMessage>
-zicardUserNotes!: Table<ZicardUserNote>
-zicardTraces!: Table<ZicardTrace>
-zicardDiaries!: Table<ZicardDiaryEntry>
+  zicardFragments!: Table<ZicardFragment>
+  zicardSessions!: Table<ZicardSession>
+  zicardMessages!: Table<ZicardMessage>
+  zicardUserNotes!: Table<ZicardUserNote>
+  zicardTraces!: Table<ZicardTrace>
+  zicardDiaries!: Table<ZicardDiaryEntry>
+
   knowledgeBases!: Table<KnowledgeBase>
   knowledgeEntries!: Table<KnowledgeEntry>
   settings!: Table<GlobalSettings & { id: string }>
@@ -43,7 +45,7 @@ zicardDiaries!: Table<ZicardDiaryEntry>
   constructor() {
     super('MisisleDB')
 
-    this.version(1).stores({
+    this.version(2).stores({
       // AI 配置
       aiProviders: 'id, name, createdAt',
 
@@ -61,42 +63,6 @@ zicardDiaries!: Table<ZicardDiaryEntry>
       chatMessages: 'id, chatId, role, createdAt',
 
       // 字卡
-      zicardLibraries: 'id, characterId, createdAt',
-      zicardFragments: 'id, libraryId, position, createdAt',
-      zicardMessages: 'id, libraryId, role, createdAt',
-      zicardUserNotes: 'id, libraryId, createdAt',
-
-      // 知识库
-      knowledgeBases: 'id, name, createdAt',
-      knowledgeEntries: 'id, knowledgeBaseId, createdAt',
-
-      // 设置（单条记录）
-      settings: 'id',
-
-      // Widget 配置
-      widgets: 'id, type, visible',
-    })
-  }
-}
-
-    this.version(2).stores({
-      // AI 配置
-      aiProviders: 'id, name, createdAt',
-
-      // 用户身份
-      userIdentities: 'id, name, isRealSelf, createdAt',
-
-      // 角色
-      characters: 'id, name, createdAt, updatedAt',
-
-      // 记忆
-      memories: 'id, characterId, chatId, type, userIdentityId, importance, createdAt',
-
-      // 聊天
-      chats: 'id, characterId, userIdentityId, mode, lastMessageAt, createdAt',
-      chatMessages: 'id, chatId, role, createdAt',
-
-      // 字卡 V2
       zicardLibraries: 'id, characterId, scope, createdAt, updatedAt',
       zicardFragments: 'id, libraryId, kind, position, category, enabled, createdAt, updatedAt',
       zicardSessions:
@@ -111,13 +77,14 @@ zicardDiaries!: Table<ZicardDiaryEntry>
       knowledgeBases: 'id, name, createdAt',
       knowledgeEntries: 'id, knowledgeBaseId, createdAt',
 
-      // 设置
+      // 设置（单条记录）
       settings: 'id',
 
       // Widget 配置
       widgets: 'id, type, visible',
     })
-
+  }
+}
 
 export const db = new MisisleDB()
 
@@ -228,7 +195,6 @@ export async function initDefaultSettings(): Promise<void> {
     return
   }
 
-  // 兼容旧数据：已有 settings 时补齐新增字段，避免 settings.ai / settings.home 未定义报错
   const defaults = createDefaultSettings()
 
   await db.settings.put({
@@ -297,13 +263,12 @@ export async function initDefaultSettings(): Promise<void> {
         ...(existing.home?.images ?? {}),
       },
       messageBoard: {
-  ...defaults.home.messageBoard,
-  ...(existing.home?.messageBoard ?? {}),
-  selectedCharacterId:
-    existing.home?.messageBoard?.selectedCharacterId ??
-    ((existing.home?.messageBoard as any)?.selectedCharacterIds?.[0] ?? null),
-},
-
+        ...defaults.home.messageBoard,
+        ...(existing.home?.messageBoard ?? {}),
+        selectedCharacterId:
+          existing.home?.messageBoard?.selectedCharacterId ??
+          ((existing.home?.messageBoard as any)?.selectedCharacterIds?.[0] ?? null),
+      },
     },
   })
 }
