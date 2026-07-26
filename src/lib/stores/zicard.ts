@@ -32,6 +32,9 @@ interface ZicardState {
 
   loadAll: () => Promise<void>
   loadSession: (sessionId: string) => Promise<void>
+  selectSession: (sessionId: string) => Promise<void>
+  acceptSaveRequest: (messageId: string) => Promise<void>
+  rejectSaveRequest: (messageId: string) => Promise<void>
 
   createSessionFromCharacter: (character: Character) => Promise<ZicardSession>
   createLocalSession: (data: {
@@ -138,6 +141,108 @@ export const useZicardStore = create<ZicardState>((set, get) => ({
       traces,
       diaries,
     })
+  },
+
+  selectSession: async (sessionId) => {
+    await get().loadSession(sessionId)
+  },
+
+  acceptSaveRequest: async (messageId) => {
+    const message = get().messages.find((item) => item.id === messageId)
+    if (!message || !message.requestAction) return
+
+    const sourceMessage = get().messages.find(
+      (item) => item.id === message.requestAction?.sourceMessageId
+    )
+    if (!sourceMessage) return
+
+    const now = Date.now()
+
+    const trace: ZicardTrace = {
+      id: generateId(),
+      sessionId: message.sessionId,
+      source: 'user_message',
+      sourceMessageId: sourceMessage.id,
+      content: sourceMessage.content,
+      excerpt: sourceMessage.content.slice(0, 30),
+      tags: [],
+      pinned: false,
+      canEcho: true,
+      createdAt: now,
+      updatedAt: now,
+    }
+
+    const diary: ZicardDiaryEntry = {
+      id: generateId(),
+      sessionId: message.sessionId,
+      title: '从用户留言生成',
+      content: sourceMessage.content,
+      source: 'message',
+      sourceId: sourceMessage.id,
+      mood: '',
+      tags: [],
+      createdAt: now,
+      updatedAt: now,
+    }
+
+    await db.transaction('rw', db.zicardTraces, db.zicardDiaries, db.zicardMessages, async () => {
+      await db.zicardTraces.add(trace)
+      await db.zicardDiaries.add(diary)
+      await db.zicardMessages.update(messageId, {
+        requestAction: {
+          ...message.requestAction,
+          status: 'accepted',
+        },
+        updatedAt: now,
+      })
+    })
+
+    set((state) => ({
+      traces: [...state.traces, trace],
+      diaries: [...state.diaries, diary],
+      messages: state.messages.map((item) =>
+        item.id === messageId
+          ? {
+              ...item,
+              requestAction: {
+                ...message.requestAction!,
+                status: 'accepted',
+              },
+              updatedAt: now,
+            }
+          : item
+      ),
+    }))
+  },
+
+  rejectSaveRequest: async (messageId) => {
+    const message = get().messages.find((item) => item.id === messageId)
+    if (!message || !message.requestAction) return
+
+    const now = Date.now()
+
+    await db.zicardMessages.update(messageId, {
+      requestAction: {
+        ...message.requestAction,
+        status: 'rejected',
+      },
+      updatedAt: now,
+    })
+
+    set((state) => ({
+      messages: state.messages.map((item) =>
+        item.id === messageId
+          ? {
+              ...item,
+              requestAction: {
+                ...message.requestAction!,
+                status: 'rejected',
+              },
+              updatedAt: now,
+            }
+          : item
+      ),
+    }))
   },
 
   createSessionFromCharacter: async (character) => {
