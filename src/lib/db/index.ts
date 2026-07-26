@@ -1,4 +1,3 @@
-// src/lib/db/index.ts
 import Dexie, { Table } from 'dexie'
 import type {
   AIProvider,
@@ -15,6 +14,18 @@ import type {
   KnowledgeEntry,
   GlobalSettings,
   WidgetConfig,
+  NovelRPConversation,
+  NovelRPMessage,
+  CharacterDiary,
+  DivinationReading,
+  TodoItem,
+  VocabularyItem,
+  VocabularySettings,
+  HomeProfileCard,
+  HomeTogetherWidget,
+  HomeImageWidget,
+  HomeMessageBoardConfig,
+  HomeMessageBoardItem,
 } from '@/types'
 
 export class MisisleDB extends Dexie {
@@ -33,6 +44,19 @@ export class MisisleDB extends Dexie {
   knowledgeEntries!: Table<KnowledgeEntry>
   settings!: Table<GlobalSettings & { id: string }>
   widgets!: Table<WidgetConfig>
+
+  novelRPConversations!: Table<NovelRPConversation>
+  novelRPMessages!: Table<NovelRPMessage>
+  characterDiaries!: Table<CharacterDiary>
+  divinationReadings!: Table<DivinationReading>
+  todoItems!: Table<TodoItem>
+  vocabularyItems!: Table<VocabularyItem>
+  vocabularySettings!: Table<VocabularySettings>
+  homeProfileCards!: Table<HomeProfileCard>
+  homeTogetherWidgets!: Table<HomeTogetherWidget>
+  homeImageWidgets!: Table<HomeImageWidget>
+  homeMessageBoardConfigs!: Table<HomeMessageBoardConfig>
+  homeMessageBoardItems!: Table<HomeMessageBoardItem>
 
   constructor() {
     super('MisisleDB')
@@ -69,6 +93,32 @@ export class MisisleDB extends Dexie {
 
       // Widget 配置
       widgets: 'id, type, visible',
+
+      // 小说 RP
+      novelRPConversations:
+        'id, userIdentityId, lastMessageAt, createdAt, updatedAt',
+      novelRPMessages: 'id, conversationId, speakerCharacterId, createdAt',
+
+      // 角色日记
+      characterDiaries: 'id, characterId, date, createdAt, updatedAt',
+
+      // 塔罗 / 雷诺曼
+      divinationReadings: 'id, deckType, spreadId, createdAt, updatedAt',
+
+      // TodoList
+      todoItems:
+        'id, completed, dueAt, remindAt, source, characterId, createdAt, updatedAt',
+
+      // 背单词
+      vocabularyItems: 'id, word, language, familiarity, createdAt, updatedAt',
+      vocabularySettings: 'id, updatedAt',
+
+      // 首页美化组件
+      homeProfileCards: 'id, updatedAt',
+      homeTogetherWidgets: 'id, updatedAt',
+      homeImageWidgets: 'id, variant, updatedAt',
+      homeMessageBoardConfigs: 'id, mode, updatedAt',
+      homeMessageBoardItems: 'id, characterId, source, createdAt',
     })
   }
 }

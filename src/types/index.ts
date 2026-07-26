@@ -271,3 +271,178 @@ export interface WidgetConfig {
   visible: boolean
 }
 
+// ============================================
+// 小说 RP
+// ============================================
+export interface NovelRPConversation {
+  id: string
+  title: string
+
+  // 引用角色库角色，不在 Novel RP 内复制创建角色
+  characterIds: string[]
+
+  // RP 模式下可绑定 User 身份
+  userIdentityId: string | null
+
+  synopsis: string
+  currentScene: string
+  writingStyle: string
+
+  lastMessage: string
+  lastMessageAt: number
+
+  createdAt: number
+  updatedAt: number
+}
+
+export interface NovelRPMessage {
+  id: string
+  conversationId: string
+  role: 'user' | 'assistant' | 'system'
+  speakerCharacterId: string | null
+  content: string
+  createdAt: number
+}
+
+// ============================================
+// 角色日记
+// ============================================
+export interface CharacterDiary {
+  id: string
+  characterId: string
+  date: string
+
+  structured: {
+    learned: string[]
+    feelings: string
+    memorable: string
+  }
+
+  content: string
+
+  isLocked: boolean
+  password: string
+
+  createdAt: number
+  updatedAt: number
+}
+
+// ============================================
+// 塔罗 / 雷诺曼
+// ============================================
+export type DivinationDeckType = 'tarot' | 'lenormand'
+
+export interface DivinationReading {
+  id: string
+  deckType: DivinationDeckType
+  spreadId: string
+  question: string
+
+  cards: DivinationReadingCard[]
+
+  fallbackInterpretation: string
+  aiInterpretation: string | null
+
+  createdAt: number
+  updatedAt: number
+}
+
+export interface DivinationReadingCard {
+  cardId: string
+  name: string
+  positionName: string
+  orientation: 'upright' | 'reversed' | 'none'
+  meaning: string
+}
+
+// ============================================
+// TodoList
+// ============================================
+export interface TodoItem {
+  id: string
+  title: string
+  description: string
+  completed: boolean
+
+  dueAt: number | null
+  remindAt: number | null
+
+  source: 'manual' | 'character' | 'system'
+  characterId: string | null
+
+  createdAt: number
+  updatedAt: number
+}
+
+// ============================================
+// 背单词
+// ============================================
+export interface VocabularyItem {
+  id: string
+  word: string
+  language: string
+  translation: string
+  phonetic: string
+  examples: string[]
+  notes: string
+
+  familiarity: 'new' | 'learning' | 'familiar' | 'mastered'
+
+  createdAt: number
+  updatedAt: number
+}
+
+export interface VocabularySettings {
+  id: string
+  enableCharacterReminder: boolean
+  reminderCharacterIds: string[]
+  targetLanguages: string[]
+  dailyGoal: number
+  updatedAt: number
+}
+
+// ============================================
+// 首页美化组件
+// ============================================
+export interface HomeProfileCard {
+  id: string
+  avatarUrl: string
+  backgroundUrl: string
+  displayName: string
+  signature: string
+  updatedAt: number
+}
+
+export interface HomeTogetherWidget {
+  id: string
+  title: string
+  leftAvatarUrl: string
+  rightAvatarUrl: string
+  startDate: string
+  note: string
+  updatedAt: number
+}
+
+export interface HomeImageWidget {
+  id: string
+  title: string
+  imageUrl: string
+  variant: 'large' | 'small'
+  updatedAt: number
+}
+
+export interface HomeMessageBoardConfig {
+  id: string
+  mode: 'ai' | 'zicard'
+  selectedCharacterIds: string[]
+  lastSeenAt: number
+  updatedAt: number
+}
+
+export interface HomeMessageBoardItem {
+  id: string
+  characterId: string | null
+  source: 'ai' | 'zicard'
+  content: string
+  createdAt: number
+}
