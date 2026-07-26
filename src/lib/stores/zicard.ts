@@ -256,10 +256,14 @@ export const useZicardStore = create<ZicardState>((set, get) => ({
   createSessionFromCharacter: async (character) => {
     const now = Date.now()
 
-    let globalLibrary = await db.zicardLibraries
-      .where('characterId')
-      .equals(null as any)
-      .first()
+    let globalLibrary = (
+  await db.zicardLibraries.toArray()
+).find(
+  (library) =>
+    library.characterId === null &&
+    library.scope === 'global'
+)
+
 
     if (!globalLibrary) {
       globalLibrary = {
