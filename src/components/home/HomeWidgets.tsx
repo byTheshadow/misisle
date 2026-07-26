@@ -240,11 +240,12 @@ export function HomeWidgets() {
         {/* User 主页卡 */}
         <article className="glass relative min-h-[272px] overflow-hidden rounded-[28px] border border-white/10 lg:col-span-7">
           <button
-            type="button"
-            onClick={() => setImageTarget('profileBackground')}
-            className="absolute inset-x-0 top-0 h-[146px] overflow-hidden text-left"
-            aria-label="更换背景图"
-          >
+  type="button"
+  onClick={() => setImageTarget('profileBackground')}
+  className="absolute inset-x-0 top-0 z-[1] h-[146px] overflow-hidden text-left"
+  aria-label="更换背景图"
+>
+
             {home.profile.backgroundUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -268,14 +269,15 @@ export function HomeWidgets() {
             <EditIcon className="h-4 w-4" />
           </button>
 
-          <div className="relative z-10 flex min-h-[272px] flex-col justify-end p-5 pt-[116px]">
-            <div className="flex items-end gap-4">
-              <button
-                type="button"
-                onClick={() => setImageTarget('profileAvatar')}
-                className="group relative h-20 w-20 shrink-0 overflow-hidden rounded-[24px] border border-white/20 bg-white/[0.09] shadow-xl"
-                aria-label="更换头像"
-              >
+         <div className="pointer-events-none relative z-10 flex min-h-[272px] flex-col justify-end p-5 pt-[116px]">
+  <div className="flex items-end gap-4">
+    <button
+      type="button"
+      onClick={() => setImageTarget('profileAvatar')}
+      className="pointer-events-auto group relative h-20 w-20 shrink-0 overflow-hidden rounded-[24px] border border-white/20 bg-white/[0.09] shadow-xl"
+      aria-label="更换头像"
+    >
+
                 {home.profile.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -295,10 +297,11 @@ export function HomeWidgets() {
               </button>
 
               <button
-                type="button"
-                onClick={() => setTextEditorTarget('profile')}
-                className="min-w-0 pb-1 text-left"
-              >
+  type="button"
+  onClick={() => setTextEditorTarget('profile')}
+  className="pointer-events-auto min-w-0 pb-1 text-left"
+>
+
                 <h2 className="truncate text-xl font-light text-mist-text">
                   {home.profile.displayName}
                 </h2>
