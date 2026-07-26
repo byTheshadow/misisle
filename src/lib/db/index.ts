@@ -288,7 +288,6 @@ export async function initDefaultSettings(): Promise<void> {
     },
   })
 
-  }
 
   // 兼容旧数据：已有 settings 时补齐新增字段，避免 settings.ai 未定义报错
   const defaults = createDefaultSettings()
