@@ -250,13 +250,13 @@ export async function initDefaultSettings(): Promise<void> {
         ...(existing.home?.images ?? {}),
       },
       messageBoard: {
-        ...defaults.home.messageBoard,
-        ...(existing.home?.messageBoard ?? {}),
-        selectedCharacterId:
-          existing.home?.messageBoard?.selectedCharacterId ??
-          existing.home?.messageBoard?.selectedCharacterIds?.[0] ??
-          null,
-      },
+  ...defaults.home.messageBoard,
+  ...(existing.home?.messageBoard ?? {}),
+  selectedCharacterId:
+    existing.home?.messageBoard?.selectedCharacterId ??
+    ((existing.home?.messageBoard as any)?.selectedCharacterIds?.[0] ?? null),
+},
+
     },
   })
 }
