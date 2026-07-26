@@ -1,4 +1,3 @@
-// src/app/characters/detail/page.tsx
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
@@ -15,7 +14,7 @@ import { Select } from '@/components/ui/Select'
 export default function CharacterDetailPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const characterId = searchParams.get('id') || ''
+  const characterId = searchParams.get('id')
 
   const {
     characters,
@@ -23,7 +22,6 @@ export default function CharacterDetailPage() {
     loadCharacters,
     updateCharacter,
     deleteCharacter,
-    getCharacter,
   } = useCharactersStore()
 
   const {
@@ -33,13 +31,15 @@ export default function CharacterDetailPage() {
     fetchModels,
   } = useProvidersStore()
 
-  const [isReady, setIsReady] = useState(false)
-  const [loadingModels, setLoadingModels] = useState(false)
+  const [isInitializing, setIsInitializing] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isFetchingModels, setIsFetchingModels] = useState(false)
 
   const character = useMemo(() => {
     if (!characterId) return undefined
-    return getCharacter(characterId)
-  }, [characterId, characters, getCharacter])
+
+    return characters.find((item) => item.id === characterId)
+  }, [characterId, characters])
 
   const [formData, setFormData] = useState({
     name: '',
@@ -69,8 +69,8 @@ export default function CharacterDetailPage() {
   useEffect(() => {
     if (!charactersLoaded) return
 
-    if (!characterId || !character) {
-      setIsReady(true)
+    if (!character) {
+      setIsInitializing(false)
       return
     }
 
@@ -86,63 +86,80 @@ export default function CharacterDetailPage() {
       temperature: character.ai.temperature,
       maxTokens: character.ai.maxTokens,
     })
-    setIsReady(true)
-  }, [charactersLoaded, characterId, character])
 
-  const selectedProvider = providers.find((p) => p.id === formData.providerId)
+    setIsInitializing(false)
+  }, [charactersLoaded, character])
 
-  const handleSave = async () => {
-    if (!character || !formData.name) return
-
-    await updateCharacter(character.id, {
-      name: formData.name,
-      avatar: formData.avatar,
-      description: formData.description,
-      relationship: formData.relationship,
-      ai: {
-        ...character.ai,
-        providerId: formData.providerId,
-        modelId: formData.modelId,
-        systemPrompt: formData.systemPrompt,
-        personality: formData.personality,
-        temperature: formData.temperature,
-        maxTokens: formData.maxTokens,
-      },
-    })
-
-    router.push('/characters')
-  }
-
-  const handleDelete = async () => {
-    if (!character) return
-
-    if (confirm(`确定要删除角色「${character.name}」吗？关联聊天、记忆和字卡库也会被删除。`)) {
-      await deleteCharacter(character.id)
-      router.push('/characters')
-    }
-  }
+  const selectedProvider = providers.find(
+    (provider) => provider.id === formData.providerId
+  )
 
   const handleFetchModels = async () => {
     if (!formData.providerId) return
 
-    setLoadingModels(true)
+    setIsFetchingModels(true)
+
     try {
-      await fetchModels(formData.providerId)
+      const models = await fetchModels(formData.providerId)
+
+      if (models.length === 0) {
+        alert('接口连接正常，但没有获取到可用模型。请确认该接口是否支持 /models 或 /model。')
+      }
     } catch (error) {
       console.error('Failed to fetch models:', error)
-      alert('获取模型失败，请检查接口配置。')
+      alert('获取模型失败，请检查设置页中的 Base URL、API Key 和接口服务状态。')
     } finally {
-      setLoadingModels(false)
+      setIsFetchingModels(false)
     }
   }
 
-  if (!isReady) {
+  const handleSave = async () => {
+  if (!formData.name.trim()) return
+
+  const character = await createCharacter({
+    name: formData.name.trim(),
+    avatar: formData.avatar.trim(),
+    description: formData.description.trim(),
+    relationship: formData.relationship.trim(),
+    ai: {
+      providerId: formData.providerId,
+      modelId: formData.modelId,
+      systemPrompt: formData.systemPrompt,
+      personality: formData.personality,
+      exampleDialogs: [],
+      temperature: formData.temperature,
+      maxTokens: formData.maxTokens,
+    },
+    bubbleStyle: null,
+    knowledgeBaseIds: [],
+  })
+
+  router.push(`/characters/detail?id=${character.id}`)
+}
+
+
+  const handleDelete = async () => {
+    if (!character) return
+
+    const confirmed = confirm(
+      `确定要删除角色「${character.name}」吗？关联的聊天、记忆和字卡库也会被删除。`
+    )
+
+    if (!confirmed) return
+
+    await deleteCharacter(character.id)
+    router.push('/characters')
+  }
+
+  if (isInitializing) {
     return (
       <div className="min-h-screen flex flex-col">
         <PageHeader title="编辑角色" backHref="/characters" />
         <main className="flex-1 p-4">
           <Card>
-            <p className="text-center text-mist-text-secondary py-8">正在加载角色...</p>
+            <p className="py-8 text-center text-mist-text-secondary">
+              正在加载角色...
+            </p>
           </Card>
         </main>
       </div>
@@ -155,8 +172,8 @@ export default function CharacterDetailPage() {
         <PageHeader title="角色不存在" backHref="/characters" />
         <main className="flex-1 p-4">
           <Card>
-            <p className="text-center text-mist-text-secondary py-8">
-              没有找到这个角色，可能已经被删除。
+            <p className="py-8 text-center text-mist-text-secondary">
+              未找到这个角色。它可能已经被删除，或链接中的角色 ID 无效。
             </p>
           </Card>
         </main>
@@ -174,8 +191,11 @@ export default function CharacterDetailPage() {
             <Button variant="ghost" onClick={handleDelete}>
               删除
             </Button>
-            <Button onClick={handleSave} disabled={!formData.name}>
-              保存
+            <Button
+              onClick={handleSave}
+              disabled={!formData.name.trim() || isSaving}
+            >
+              {isSaving ? '保存中...' : '保存'}
             </Button>
           </div>
         }
@@ -183,20 +203,33 @@ export default function CharacterDetailPage() {
 
       <main className="flex-1 p-4 space-y-4">
         <Card>
-          <h3 className="text-sm font-medium text-mist-text mb-4">基础信息</h3>
+          <h3 className="mb-4 text-sm font-medium text-mist-text">
+            基础信息
+          </h3>
+
           <div className="space-y-4">
             <Input
               label="名称"
               placeholder="角色名称"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(event) =>
+                setFormData({
+                  ...formData,
+                  name: event.target.value,
+                })
+              }
             />
 
             <Input
               label="头像 URL"
               placeholder="https://..."
               value={formData.avatar}
-              onChange={(e) => setFormData({ ...formData, avatar: e.target.value })}
+              onChange={(event) =>
+                setFormData({
+                  ...formData,
+                  avatar: event.target.value,
+                })
+              }
             />
 
             <Textarea
@@ -204,29 +237,45 @@ export default function CharacterDetailPage() {
               placeholder="角色的简短描述..."
               rows={3}
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(event) =>
+                setFormData({
+                  ...formData,
+                  description: event.target.value,
+                })
+              }
             />
 
             <Input
               label="与你的关系"
               placeholder="例如：恋人、朋友、同事..."
               value={formData.relationship}
-              onChange={(e) => setFormData({ ...formData, relationship: e.target.value })}
+              onChange={(event) =>
+                setFormData({
+                  ...formData,
+                  relationship: event.target.value,
+                })
+              }
             />
           </div>
         </Card>
 
         <Card>
-          <div className="flex items-center justify-between gap-3 mb-4">
-            <h3 className="text-sm font-medium text-mist-text">AI 配置</h3>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-medium text-mist-text">AI 配置</h3>
+              <p className="mt-1 text-xs text-mist-text-secondary">
+                角色可单独覆盖设置页的默认聊天模型。
+              </p>
+            </div>
+
             {formData.providerId && (
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={handleFetchModels}
-                disabled={loadingModels}
+                disabled={isFetchingModels}
               >
-                {loadingModels ? '获取中...' : '刷新模型'}
+                {isFetchingModels ? '获取中...' : '刷新模型'}
               </Button>
             )}
           </div>
@@ -235,29 +284,62 @@ export default function CharacterDetailPage() {
             <Select
               label="AI 接口"
               value={formData.providerId}
-              onChange={(e) =>
+              onChange={(event) =>
                 setFormData({
                   ...formData,
-                  providerId: e.target.value,
+                  providerId: event.target.value,
                   modelId: '',
                 })
               }
               options={[
-                { value: '', label: '请选择接口' },
-                ...providers.map((p) => ({ value: p.id, label: p.name })),
+                { value: '', label: '不单独指定，使用全局默认聊天模型' },
+                ...providers.map((provider) => ({
+                  value: provider.id,
+                  label: provider.name,
+                })),
               ]}
             />
 
             {selectedProvider && (
-              <Select
-                label="模型"
-                value={formData.modelId}
-                onChange={(e) => setFormData({ ...formData, modelId: e.target.value })}
-                options={[
-                  { value: '', label: '请选择模型' },
-                  ...selectedProvider.models.map((m) => ({ value: m, label: m })),
-                ]}
-              />
+              <>
+                <Select
+                  label="模型"
+                  value={formData.modelId}
+                  onChange={(event) =>
+                    setFormData({
+                      ...formData,
+                      modelId: event.target.value,
+                    })
+                  }
+                  options={[
+                    {
+                      value: '',
+                      label:
+                        selectedProvider.models.length > 0
+                          ? '请选择模型'
+                          : '暂无模型，请先点击“刷新模型”',
+                    },
+                    ...selectedProvider.models.map((model) => ({
+                      value: model,
+                      label: model,
+                    })),
+                  ]}
+                />
+
+                {selectedProvider.models.length === 0 && (
+                  <p className="text-xs text-mist-text-secondary">
+                    此接口尚未获取模型。请点击右上方“刷新模型”，系统会依次请求
+                    <code className="mx-1 rounded bg-white/10 px-1.5 py-0.5">
+                      /models
+                    </code>
+                    和
+                    <code className="mx-1 rounded bg-white/10 px-1.5 py-0.5">
+                      /model
+                    </code>
+                    。
+                  </p>
+                )}
+              </>
             )}
 
             <Textarea
@@ -265,7 +347,12 @@ export default function CharacterDetailPage() {
               placeholder="定义角色的行为方式..."
               rows={6}
               value={formData.systemPrompt}
-              onChange={(e) => setFormData({ ...formData, systemPrompt: e.target.value })}
+              onChange={(event) =>
+                setFormData({
+                  ...formData,
+                  systemPrompt: event.target.value,
+                })
+              }
             />
 
             <Textarea
@@ -273,21 +360,26 @@ export default function CharacterDetailPage() {
               placeholder="描述角色的性格特点..."
               rows={3}
               value={formData.personality}
-              onChange={(e) => setFormData({ ...formData, personality: e.target.value })}
+              onChange={(event) =>
+                setFormData({
+                  ...formData,
+                  personality: event.target.value,
+                })
+              }
             />
 
             <div className="grid grid-cols-2 gap-4">
               <Input
                 label="Temperature"
                 type="number"
-                step="0.1"
                 min="0"
                 max="2"
+                step="0.1"
                 value={formData.temperature}
-                onChange={(e) =>
+                onChange={(event) =>
                   setFormData({
                     ...formData,
-                    temperature: parseFloat(e.target.value) || 0.7,
+                    temperature: Number(event.target.value) || 0.7,
                   })
                 }
               />
@@ -295,13 +387,13 @@ export default function CharacterDetailPage() {
               <Input
                 label="Max Tokens"
                 type="number"
-                step="100"
                 min="100"
+                step="100"
                 value={formData.maxTokens}
-                onChange={(e) =>
+                onChange={(event) =>
                   setFormData({
                     ...formData,
-                    maxTokens: parseInt(e.target.value) || 2000,
+                    maxTokens: Number(event.target.value) || 2000,
                   })
                 }
               />
