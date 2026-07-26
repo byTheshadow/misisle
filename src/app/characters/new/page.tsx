@@ -15,7 +15,13 @@ import { Select } from '@/components/ui/Select'
 export default function NewCharacterPage() {
   const router = useRouter()
   const { createCharacter } = useCharactersStore()
-  const { providers, isLoaded: providersLoaded, loadProviders } = useProvidersStore()
+  const {
+    providers,
+    isLoaded: providersLoaded,
+    loadProviders,
+  } = useProvidersStore()
+
+  const [isSaving, setIsSaving] = useState(false)
 
   const [formData, setFormData] = useState({
     name: '',
@@ -36,30 +42,38 @@ export default function NewCharacterPage() {
     }
   }, [providersLoaded, loadProviders])
 
-  const selectedProvider = providers.find((p) => p.id === formData.providerId)
+  const selectedProvider = providers.find(
+    (provider) => provider.id === formData.providerId
+  )
 
   const handleSave = async () => {
-    if (!formData.name) return
+    if (!formData.name.trim() || isSaving) return
 
-    await createCharacter({
-      name: formData.name,
-      avatar: formData.avatar,
-      description: formData.description,
-      relationship: formData.relationship,
-      ai: {
-        providerId: formData.providerId,
-        modelId: formData.modelId,
-        systemPrompt: formData.systemPrompt,
-        personality: formData.personality,
-        exampleDialogs: [],
-        temperature: formData.temperature,
-        maxTokens: formData.maxTokens,
-      },
-      bubbleStyle: null,
-      knowledgeBaseIds: [],
-    })
+    setIsSaving(true)
 
-    router.push('/characters')
+    try {
+      const character = await createCharacter({
+        name: formData.name.trim(),
+        avatar: formData.avatar.trim(),
+        description: formData.description.trim(),
+        relationship: formData.relationship.trim(),
+        ai: {
+          providerId: formData.providerId,
+          modelId: formData.modelId,
+          systemPrompt: formData.systemPrompt,
+          personality: formData.personality,
+          exampleDialogs: [],
+          temperature: formData.temperature,
+          maxTokens: formData.maxTokens,
+        },
+        bubbleStyle: null,
+        knowledgeBaseIds: [],
+      })
+
+      router.push(`/characters/detail?id=${character.id}`)
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -68,83 +82,166 @@ export default function NewCharacterPage() {
         title="新建角色"
         backHref="/characters"
         actions={
-          <Button onClick={handleSave} disabled={!formData.name}>
-            保存
+          <Button
+            onClick={handleSave}
+            disabled={!formData.name.trim() || isSaving}
+          >
+            {isSaving ? '保存中...' : '保存'}
           </Button>
         }
       />
 
       <main className="flex-1 p-4 space-y-4">
-        {/* 基础信息 */}
         <Card>
-          <h3 className="text-sm font-medium text-mist-text mb-4">基础信息</h3>
+          <h3 className="text-sm font-medium text-mist-text mb-4">
+            基础信息
+          </h3>
+
           <div className="space-y-4">
             <Input
               label="名称"
               placeholder="角色名称"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(event) =>
+                setFormData({
+                  ...formData,
+                  name: event.target.value,
+                })
+              }
             />
+
             <Input
               label="头像 URL"
               placeholder="https://..."
               value={formData.avatar}
-              onChange={(e) => setFormData({ ...formData, avatar: e.target.value })}
+              onChange={(event) =>
+                setFormData({
+                  ...formData,
+                  avatar: event.target.value,
+                })
+              }
             />
+
             <Textarea
               label="描述"
               placeholder="角色的简短描述..."
               rows={3}
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(event) =>
+                setFormData({
+                  ...formData,
+                  description: event.target.value,
+                })
+              }
             />
+
             <Input
               label="与你的关系"
               placeholder="例如：恋人、朋友、同事..."
               value={formData.relationship}
-              onChange={(e) => setFormData({ ...formData, relationship: e.target.value })}
+              onChange={(event) =>
+                setFormData({
+                  ...formData,
+                  relationship: event.target.value,
+                })
+              }
             />
           </div>
         </Card>
 
-        {/* AI 配置 */}
         <Card>
-          <h3 className="text-sm font-medium text-mist-text mb-4">AI 配置</h3>
+          <div className="mb-4">
+            <h3 className="text-sm font-medium text-mist-text">AI 配置</h3>
+            <p className="mt-1 text-xs text-mist-text-secondary">
+              可以不单独指定接口和模型。留空时，聊天会使用设置页里的全局默认聊天模型。
+            </p>
+          </div>
+
           <div className="space-y-4">
             <Select
               label="AI 接口"
               value={formData.providerId}
-              onChange={(e) => setFormData({ ...formData, providerId: e.target.value, modelId: '' })}
+              onChange={(event) =>
+                setFormData({
+                  ...formData,
+                  providerId: event.target.value,
+                  modelId: '',
+                })
+              }
               options={[
-                { value: '', label: '请选择接口' },
-                ...providers.map((p) => ({ value: p.id, label: p.name })),
+                {
+                  value: '',
+                  label: '不单独指定，使用全局默认聊天模型',
+                },
+                ...providers.map((provider) => ({
+                  value: provider.id,
+                  label: provider.name,
+                })),
               ]}
             />
+
             {selectedProvider && (
-              <Select
-                label="模型"
-                value={formData.modelId}
-                onChange={(e) => setFormData({ ...formData, modelId: e.target.value })}
-                options={[
-                  { value: '', label: '请选择模型' },
-                  ...selectedProvider.models.map((m) => ({ value: m, label: m })),
-                ]}
-              />
+              <>
+                <Select
+                  label="模型"
+                  value={formData.modelId}
+                  onChange={(event) =>
+                    setFormData({
+                      ...formData,
+                      modelId: event.target.value,
+                    })
+                  }
+                  options={[
+                    {
+                      value: '',
+                      label:
+                        selectedProvider.models.length > 0
+                          ? '请选择模型'
+                          : '暂无模型，请先到设置页刷新模型',
+                    },
+                    ...selectedProvider.models.map((model) => ({
+                      value: model,
+                      label: model,
+                    })),
+                  ]}
+                />
+
+                {selectedProvider.models.length === 0 && (
+                  <p className="text-xs leading-5 text-mist-text-secondary">
+                    当前接口还没有模型列表。请先到
+                    <span className="mx-1 text-mist-text">设置 → AI 接口</span>
+                    中点击该接口的刷新按钮获取模型。
+                  </p>
+                )}
+              </>
             )}
+
             <Textarea
               label="系统提示词"
               placeholder="定义角色的行为方式..."
               rows={6}
               value={formData.systemPrompt}
-              onChange={(e) => setFormData({ ...formData, systemPrompt: e.target.value })}
+              onChange={(event) =>
+                setFormData({
+                  ...formData,
+                  systemPrompt: event.target.value,
+                })
+              }
             />
+
             <Textarea
               label="性格描述"
               placeholder="描述角色的性格特点..."
               rows={3}
               value={formData.personality}
-              onChange={(e) => setFormData({ ...formData, personality: e.target.value })}
+              onChange={(event) =>
+                setFormData({
+                  ...formData,
+                  personality: event.target.value,
+                })
+              }
             />
+
             <div className="grid grid-cols-2 gap-4">
               <Input
                 label="Temperature"
@@ -153,15 +250,26 @@ export default function NewCharacterPage() {
                 min="0"
                 max="2"
                 value={formData.temperature}
-                onChange={(e) => setFormData({ ...formData, temperature: parseFloat(e.target.value) || 0.7 })}
+                onChange={(event) =>
+                  setFormData({
+                    ...formData,
+                    temperature: parseFloat(event.target.value) || 0.7,
+                  })
+                }
               />
+
               <Input
                 label="Max Tokens"
                 type="number"
                 step="100"
                 min="100"
                 value={formData.maxTokens}
-                onChange={(e) => setFormData({ ...formData, maxTokens: parseInt(e.target.value) || 2000 })}
+                onChange={(event) =>
+                  setFormData({
+                    ...formData,
+                    maxTokens: parseInt(event.target.value) || 2000,
+                  })
+                }
               />
             </div>
           </div>

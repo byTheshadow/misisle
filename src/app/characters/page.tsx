@@ -1,7 +1,6 @@
-// src/app/characters/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import Link from 'next/link'
 import { useCharactersStore } from '@/lib/stores/characters'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -44,7 +43,10 @@ export default function CharactersPage() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {characters.map((character) => (
-              <Link key={character.id} href={`/characters/${character.id}`}>
+              <Link
+                key={character.id}
+                href={`/characters/detail?id=${character.id}`}
+              >
                 <Card className="h-full hover:bg-white/5">
                   <div className="flex items-start gap-4">
                     <Avatar
