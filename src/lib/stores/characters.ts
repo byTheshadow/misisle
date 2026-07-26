@@ -8,7 +8,9 @@ interface CharactersState {
   isLoaded: boolean
 
   loadCharacters: () => Promise<void>
-  createCharacter: (data: Omit<Character, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Character>
+  createCharacter: (
+    data: Omit<Character, 'id' | 'createdAt' | 'updatedAt'>
+  ) => Promise<Character>
   updateCharacter: (id: string, data: Partial<Character>) => Promise<void>
   deleteCharacter: (id: string) => Promise<void>
   getCharacter: (id: string) => Character | undefined
@@ -25,28 +27,41 @@ export const useCharactersStore = create<CharactersState>((set, get) => ({
 
   createCharacter: async (data) => {
     const now = Date.now()
+
     const character: Character = {
       id: generateId(),
       ...data,
       createdAt: now,
       updatedAt: now,
     }
+
     await db.characters.add(character)
-    set((state) => ({ characters: [character, ...state.characters] }))
+
+    set((state) => ({
+      characters: [character, ...state.characters],
+    }))
+
     return character
   },
 
   updateCharacter: async (id, data) => {
     const updatedAt = Date.now()
-    await db.characters.update(id, { ...data, updatedAt })
+
+    await db.characters.update(id, {
+      ...data,
+      updatedAt,
+    })
+
     set((state) => ({
-      characters: state.characters.map((c) =>
-        c.id === id ? { ...c, ...data, updatedAt } : c
+      characters: state.characters.map((character) =>
+        character.id === id
+          ? { ...character, ...data, updatedAt }
+          : character
       ),
     }))
   },
 
-      deleteCharacter: async (id) => {
+  deleteCharacter: async (id) => {
     await db.transaction(
       'rw',
       [
@@ -65,31 +80,30 @@ export const useCharactersStore = create<CharactersState>((set, get) => ({
       async () => {
         await db.characters.delete(id)
 
-        // 后续原有删除逻辑保持不变
-      }
-    )
-
-    set((state) => ({
-      characters: state.characters.filter((c) => c.id !== id),
-    }))
-  },
-
-        await db.characters.delete(id)
-
-        const chatIds = (
-          await db.chats.where('characterId').equals(id).toArray()
-        ).map((chat) => chat.id)
+        // 删除普通 AI 聊天及其消息。
+        const chats = await db.chats.where('characterId').equals(id).toArray()
+        const chatIds = chats.map((chat) => chat.id)
 
         if (chatIds.length > 0) {
           await db.chatMessages.where('chatId').anyOf(chatIds).delete()
           await db.chats.where('id').anyOf(chatIds).delete()
         }
 
+        // 删除此角色的 AI 记忆。
         await db.memories.where('characterId').equals(id).delete()
 
-        const boundLibraryIds = (
-          await db.zicardLibraries.where('characterId').equals(id).toArray()
-        ).map((library) => library.id)
+        /**
+         * 仅删除直接绑定这个角色的字卡库。
+         *
+         * 通用字卡库使用 characterId: null，
+         * 因此不会被这里的规则删除。
+         */
+        const boundLibraries = await db.zicardLibraries
+          .where('characterId')
+          .equals(id)
+          .toArray()
+
+        const boundLibraryIds = boundLibraries.map((library) => library.id)
 
         if (boundLibraryIds.length > 0) {
           await db.zicardFragments.where('libraryId').anyOf(boundLibraryIds).delete()
@@ -97,26 +111,30 @@ export const useCharactersStore = create<CharactersState>((set, get) => ({
           await db.zicardLibraries.where('id').anyOf(boundLibraryIds).delete()
         }
 
-        const sessionIds = (
-          await db.zicardSessions.where('characterId').equals(id).toArray()
-        ).map((session) => session.id)
+        // 删除引用此全局角色的字卡消息框及会话内数据。
+        const zicardSessions = await db.zicardSessions
+          .where('characterId')
+          .equals(id)
+          .toArray()
 
-        if (sessionIds.length > 0) {
-          await db.zicardMessages.where('sessionId').anyOf(sessionIds).delete()
-          await db.zicardTraces.where('sessionId').anyOf(sessionIds).delete()
-          await db.zicardDiaries.where('sessionId').anyOf(sessionIds).delete()
-          await db.zicardUserNotes.where('sessionId').anyOf(sessionIds).delete()
-          await db.zicardSessions.where('id').anyOf(sessionIds).delete()
+        const zicardSessionIds = zicardSessions.map((session) => session.id)
+
+        if (zicardSessionIds.length > 0) {
+          await db.zicardMessages.where('sessionId').anyOf(zicardSessionIds).delete()
+          await db.zicardUserNotes.where('sessionId').anyOf(zicardSessionIds).delete()
+          await db.zicardTraces.where('sessionId').anyOf(zicardSessionIds).delete()
+          await db.zicardDiaries.where('sessionId').anyOf(zicardSessionIds).delete()
+          await db.zicardSessions.where('id').anyOf(zicardSessionIds).delete()
         }
       }
     )
 
     set((state) => ({
-      characters: state.characters.filter((c) => c.id !== id),
+      characters: state.characters.filter((character) => character.id !== id),
     }))
   },
 
   getCharacter: (id) => {
-    return get().characters.find((c) => c.id === id)
+    return get().characters.find((character) => character.id === id)
   },
 }))
