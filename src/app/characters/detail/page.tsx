@@ -103,40 +103,48 @@ export default function CharacterDetailPage() {
       const models = await fetchModels(formData.providerId)
 
       if (models.length === 0) {
-        alert('接口连接正常，但没有获取到可用模型。请确认该接口是否支持 /models 或 /model。')
+        alert(
+          '接口可以连接，但没有获取到可用模型。请确认设置页中的 Base URL 是否正确，以及服务是否支持 /models 或 /model。'
+        )
       }
     } catch (error) {
       console.error('Failed to fetch models:', error)
-      alert('获取模型失败，请检查设置页中的 Base URL、API Key 和接口服务状态。')
+      alert('获取模型失败，请检查设置页中的 API 接口配置。')
     } finally {
       setIsFetchingModels(false)
     }
   }
 
   const handleSave = async () => {
-  if (!formData.name.trim()) return
+    if (!character || !formData.name.trim()) return
 
-  const character = await createCharacter({
-    name: formData.name.trim(),
-    avatar: formData.avatar.trim(),
-    description: formData.description.trim(),
-    relationship: formData.relationship.trim(),
-    ai: {
-      providerId: formData.providerId,
-      modelId: formData.modelId,
-      systemPrompt: formData.systemPrompt,
-      personality: formData.personality,
-      exampleDialogs: [],
-      temperature: formData.temperature,
-      maxTokens: formData.maxTokens,
-    },
-    bubbleStyle: null,
-    knowledgeBaseIds: [],
-  })
+    setIsSaving(true)
 
-  router.push(`/characters/detail?id=${character.id}`)
-}
+    try {
+      await updateCharacter(character.id, {
+        name: formData.name.trim(),
+        avatar: formData.avatar.trim(),
+        description: formData.description.trim(),
+        relationship: formData.relationship.trim(),
+        ai: {
+          ...character.ai,
+          providerId: formData.providerId,
+          modelId: formData.modelId,
+          systemPrompt: formData.systemPrompt,
+          personality: formData.personality,
+          temperature: formData.temperature,
+          maxTokens: formData.maxTokens,
+        },
+      })
 
+      router.push('/characters')
+    } catch (error) {
+      console.error('Failed to update character:', error)
+      alert('保存角色失败，请稍后重试。')
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   const handleDelete = async () => {
     if (!character) return
@@ -147,14 +155,20 @@ export default function CharacterDetailPage() {
 
     if (!confirmed) return
 
-    await deleteCharacter(character.id)
-    router.push('/characters')
+    try {
+      await deleteCharacter(character.id)
+      router.push('/characters')
+    } catch (error) {
+      console.error('Failed to delete character:', error)
+      alert('删除角色失败，请稍后重试。')
+    }
   }
 
   if (isInitializing) {
     return (
       <div className="min-h-screen flex flex-col">
         <PageHeader title="编辑角色" backHref="/characters" />
+
         <main className="flex-1 p-4">
           <Card>
             <p className="py-8 text-center text-mist-text-secondary">
@@ -170,6 +184,7 @@ export default function CharacterDetailPage() {
     return (
       <div className="min-h-screen flex flex-col">
         <PageHeader title="角色不存在" backHref="/characters" />
+
         <main className="flex-1 p-4">
           <Card>
             <p className="py-8 text-center text-mist-text-secondary">
@@ -191,6 +206,7 @@ export default function CharacterDetailPage() {
             <Button variant="ghost" onClick={handleDelete}>
               删除
             </Button>
+
             <Button
               onClick={handleSave}
               disabled={!formData.name.trim() || isSaving}
@@ -260,11 +276,13 @@ export default function CharacterDetailPage() {
         </Card>
 
         <Card>
-          <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="mb-4 flex items-start justify-between gap-3">
             <div>
-              <h3 className="text-sm font-medium text-mist-text">AI 配置</h3>
-              <p className="mt-1 text-xs text-mist-text-secondary">
-                角色可单独覆盖设置页的默认聊天模型。
+              <h3 className="text-sm font-medium text-mist-text">
+                AI 配置
+              </h3>
+              <p className="mt-1 text-xs leading-5 text-mist-text-secondary">
+                此处为角色单独配置。未选择接口或模型时，后续聊天逻辑应使用设置页面中的默认聊天模型。
               </p>
             </div>
 
@@ -292,7 +310,10 @@ export default function CharacterDetailPage() {
                 })
               }
               options={[
-                { value: '', label: '不单独指定，使用全局默认聊天模型' },
+                {
+                  value: '',
+                  label: '不单独指定，使用全局默认聊天模型',
+                },
                 ...providers.map((provider) => ({
                   value: provider.id,
                   label: provider.name,
@@ -327,8 +348,9 @@ export default function CharacterDetailPage() {
                 />
 
                 {selectedProvider.models.length === 0 && (
-                  <p className="text-xs text-mist-text-secondary">
-                    此接口尚未获取模型。请点击右上方“刷新模型”，系统会依次请求
+                  <p className="text-xs leading-5 text-mist-text-secondary">
+                    此接口暂未拉取模型。请点击“刷新模型”，系统会从设置的 Base
+                    URL 依次尝试请求
                     <code className="mx-1 rounded bg-white/10 px-1.5 py-0.5">
                       /models
                     </code>
